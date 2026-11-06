@@ -1,4 +1,19 @@
-# AirPlay Receiver for Android
+# N Vision AirPlay (AirPlay receiver for Android TV)
+
+> **N Vision** fork of [jqssun/android-airplay-server](https://github.com/jqssun/android-airplay-server) (GPL-3.0), based on [UxPlay](https://github.com/FDH2/UxPlay). All credit for the receiver itself goes to upstream.
+>
+> Changes in this fork:
+> - When the last AirPlay sender disconnects, the receiver closes and the TV returns to the app that was open before.
+> - A fixed AirPlay password (`airplay_password`), instead of only the random on-screen PIN.
+> - Hebrew UI, an always-dark N Vision look with the N Vision mark, app name "N Vision AirPlay".
+> - A status icon for launchers: AirPlay glyph with a green dot while the server runs, red when it is stopped.
+> - Release builds for `arm64-v8a`, `armeabi-v7a` and `x86_64`.
+>
+> Ready APK: [Releases](https://github.com/Nil5959/nvision-airplay/releases/latest). Used by [N Vision Fast TV](https://github.com/Nil5959/nvision-fast-tv).
+> Set the room name / password over ADB:
+> `am broadcast -n io.github.jqssun.airplay/.SettingsReceiver -a io.github.jqssun.airplay.SET_SETTING --es key server_name --es value "Living room"`
+> (`--es key airplay_password --es value 1234` for a password). The rest of this README is upstream's.
+
 
 [![Stars](https://img.shields.io/github/stars/jqssun/android-airplay-server)](https://github.com/jqssun/android-airplay-server)
 [![GitHub](https://img.shields.io/github/downloads/jqssun/android-airplay-server/total?label=GitHub&logo=GitHub)](https://github.com/jqssun/android-airplay-server/releases)
