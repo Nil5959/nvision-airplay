@@ -36,6 +36,7 @@ typedef struct {
     jmethodID on_video_session_poll;
     int h265_enabled;
     int require_pin;
+    char password[65];
     char *registered_keys[16];
     int registered_count;
     /* playback info snapshot pushed by kotlin, read on the native httpd thread */

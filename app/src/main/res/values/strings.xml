@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AirPlay Server</string>
+    <string name="app_name">N Vision AirPlay</string>
 
     <!-- Notification -->
     <string name="notification_channel">AirPlay Service</string>
@@ -96,6 +96,8 @@
     <!-- Settings: Connection -->
     <string name="setting_require_pin">Require PIN (Beta)</string>
     <string name="setting_require_pin_desc">Require 4-digit PIN for each new connection</string>
+    <string name="setting_password">AirPlay password</string>
+    <string name="setting_password_desc">Leave empty for no password. When set, the iPhone asks for it once per device.</string>
     <string name="setting_allow_new_conn">Allow new connections</string>
     <string name="setting_allow_new_conn_desc">Drop current sender when a new one connects</string>
 

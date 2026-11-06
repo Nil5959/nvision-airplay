@@ -53,6 +53,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val maxFps by viewModel.pref(Prefs.MAX_FPS).collectAsState()
     val overscanned by viewModel.pref(Prefs.OVERSCANNED).collectAsState()
     val requirePin by viewModel.pref(Prefs.REQUIRE_PIN).collectAsState()
+    val password by viewModel.pref(Prefs.PASSWORD).collectAsState()
     val allowNewConn by viewModel.pref(Prefs.ALLOW_NEW_CONN).collectAsState()
     val usbOnly by viewModel.pref(Prefs.USB_ONLY).collectAsState()
     val autoStart by viewModel.pref(Prefs.AUTO_START).collectAsState()
@@ -127,6 +128,13 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 true to stringResource(R.string.chip_usb_only),
             ),
             onValueChange = { viewModel.set(Prefs.USB_ONLY, it) }
+        )
+
+        SettingTextField(
+            label = stringResource(R.string.setting_password),
+            value = password,
+            description = stringResource(R.string.setting_password_desc),
+            onCommit = { viewModel.set(Prefs.PASSWORD, it.take(64)) }
         )
 
         SettingSwitch(
