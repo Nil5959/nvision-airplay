@@ -35,6 +35,7 @@ void android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject ca
     ctx->callback_obj = (*env)->NewGlobalRef(env, callback_obj);
     ctx->h265_enabled = 1;
     ctx->require_pin = 0;
+    ctx->password[0] = '\0';
     ctx->registered_count = 0;
     ctx->audio_engine = NULL;
     memset(ctx->registered_keys, 0, sizeof(ctx->registered_keys));
@@ -191,6 +192,13 @@ static void _display_pin(void *cls, char *pin) {
     jstring jpin = (*env)->NewStringUTF(env, pin);
     (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_display_pin, jpin);
     (*env)->DeleteLocalRef(env, jpin);
+}
+
+/* fixed client-access password (RFC2617 digest), set from the app settings */
+static const char *_passwd(void *cls, int *len) {
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    *len = (int)strlen(ctx->password);
+    return ctx->password;
 }
 
 /* Stubs for less critical callbacks */
@@ -413,6 +421,7 @@ void android_callbacks_fill(raop_callbacks_t *cbs, android_callback_ctx_t *ctx) 
     cbs->video_report_size = _video_report_size;
     cbs->mirror_video_running = _mirror_video_running;
     cbs->display_pin = _display_pin;
+    if (ctx->password[0]) cbs->passwd = _passwd;
     cbs->video_set_codec = _video_set_codec;
     cbs->on_video_play = _video_play;
     cbs->on_video_wait_ready = _video_wait_ready;

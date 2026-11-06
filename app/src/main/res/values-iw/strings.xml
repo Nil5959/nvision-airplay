@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nil AirPlay</string>
+
+    <string name="notification_channel">שירות AirPlay</string>
+    <string name="notification_title">AirPlay פועל</string>
+    <string name="notification_text">מוכן לקבל חיבורי AirPlay</string>
+    <string name="notification_pin_title">נדרש קוד AirPlay</string>
+    <string name="notification_pin_text">קוד: %1$s</string>
+    <string name="stop_service">עצור</string>
+
+    <string name="tab_overview">ראשי</string>
+    <string name="tab_logs">יומן</string>
+    <string name="tab_settings">הגדרות</string>
+
+    <string name="server_stopped">השרת כבוי</string>
+    <string name="waiting_for_connection">ממתין לחיבור מהאייפון…</string>
+    <string name="waiting_for_playback">לחץ הפעלה במכשיר המשדר…</string>
+    <string name="error_starting_server">שגיאה בהפעלת השרת</string>
+    <string name="connected_count">%d מחוברים</string>
+    <string name="error_label">שגיאה</string>
+    <string name="stopped_label">כבוי</string>
+    <string name="btn_start">הפעל</string>
+    <string name="btn_stop">עצור</string>
+    <string name="btn_allow">אפשר</string>
+    <string name="btn_open_settings">פתח הגדרות</string>
+    <string name="local_network_label">נדרשת גישה למכשירים קרובים</string>
+    <string name="local_network_desc">אפשר גישה למכשירים קרובים כדי שמכשירי AirPlay ימצאו את המכשיר הזה ויתחברו אליו</string>
+    <string name="unknown_track">לא ידוע</string>
+
+    <string name="cd_pip">תמונה בתוך תמונה</string>
+    <string name="cd_fullscreen">מסך מלא</string>
+    <string name="cd_exit_fullscreen">יציאה ממסך מלא</string>
+    <string name="cd_cover_art">עטיפה</string>
+    <string name="cd_play_pause">הפעל/השהה</string>
+    <string name="cd_rewind">אחורה</string>
+    <string name="cd_fast_forward">קדימה</string>
+    <string name="volume_server">עוצמת הטלוויזיה</string>
+    <string name="volume_client">עוצמת המשדר</string>
+    <string name="cd_download">הורד סרטון</string>
+    <string name="cd_cancel_download">בטל הורדה</string>
+
+    <string name="download_saved">נשמר ב-%1$s</string>
+    <string name="download_failed">ההורדה נכשלה</string>
+
+    <string name="gesture_seek_seconds">%1$d שניות</string>
+    <string name="seconds_short">%1$d שנ׳</string>
+    <string name="select_playback_speed">מהירות ניגון</string>
+    <string name="cd_reset_speed">אפס מהירות</string>
+    <string name="skip_silence">דלג על שקט</string>
+
+    <string name="cd_back">חזרה</string>
+    <string name="cd_copy_url">העתק קישור לסרטון</string>
+    <string name="cd_rotate">סובב מסך</string>
+    <string name="cd_lock_controls">נעל פקדים</string>
+    <string name="cd_unlock_controls">שחרר פקדים</string>
+    <string name="scale_best_fit">התאמה</string>
+    <string name="scale_stretch">מתיחה</string>
+    <string name="scale_crop">חיתוך</string>
+
+    <string name="dialog_pin_title">קוד AirPlay</string>
+    <string name="btn_ok">אישור</string>
+
+    <string name="btn_export">ייצוא</string>
+    <string name="btn_clear">ניקוי</string>
+    <string name="export_logs_chooser_title">ייצוא יומן</string>
+
+    <string name="section_server">שרת</string>
+    <string name="section_connection">חיבור</string>
+    <string name="section_display">תצוגה</string>
+    <string name="section_decode">פענוח</string>
+    <string name="section_developer">מפתחים</string>
+
+    <string name="setting_server_name">שם ה-AirPlay</string>
+    <string name="setting_server_port">פורט</string>
+    <string name="setting_auto_start">הפעלה אוטומטית</string>
+    <string name="setting_auto_start_desc">הפעל את שרת ה-AirPlay כשהאפליקציה נפתחת</string>
+    <string name="setting_boot_auto_start">הפעלה עם הדלקת המכשיר</string>
+    <string name="setting_boot_auto_start_desc">הפעל את שרת ה-AirPlay בכל הדלקה</string>
+    <string name="setting_run_in_background">פעולה ברקע</string>
+    <string name="setting_run_in_background_desc">השאר את השרת פועל גם אחרי יציאה מהאפליקציה</string>
+
+    <string name="setting_password">סיסמת AirPlay</string>
+    <string name="setting_password_desc">השאר ריק בלי סיסמה. אם מוגדרת, האייפון יבקש אותה פעם אחת לכל מכשיר.</string>
+    <string name="setting_require_pin">קוד אקראי בכל חיבור (בטא)</string>
+    <string name="setting_require_pin_desc">הטלוויזיה תציג קוד בן 4 ספרות לכל חיבור חדש</string>
+    <string name="setting_allow_new_conn">אפשר חיבור חדש</string>
+    <string name="setting_allow_new_conn_desc">נתק את המשדר הנוכחי כשמשדר חדש מתחבר</string>
+
+    <string name="setting_idle_preview">תצוגה מקדימה בהמתנה</string>
+    <string name="setting_idle_preview_desc">הצג את משטח הווידאו בזמן המתנה לחיבור</string>
+    <string name="setting_auto_fullscreen">מסך מלא אוטומטי</string>
+    <string name="setting_auto_fullscreen_desc">עבור למסך מלא כשמשדר מתחבר</string>
+    <string name="setting_keep_screen_on">השאר מסך דלוק</string>
+    <string name="setting_keep_screen_on_desc">מנע כיבוי מסך בזמן שמשדר מחובר</string>
+    <string name="setting_advertise_video">פרסם תמיכה בווידאו</string>
+    <string name="setting_advertise_video_desc">כשכבוי, סרטונים ישודרו כשמע בלבד</string>
+    <string name="setting_advertise_mirroring">פרסם תמיכה בשיקוף מסך</string>
+    <string name="setting_advertise_mirroring_desc">כשכבוי, המכשיר לא יופיע בשיקוף מסך</string>
+    <string name="setting_advertise_audio">פרסם תמיכה בשמע</string>
+    <string name="setting_advertise_audio_desc">כשכבוי, המכשיר יופיע רק לשיקוף מסך ולא בנגני מוזיקה</string>
+    <string name="setting_alac">פרסם קודק ALAC</string>
+    <string name="setting_alac_desc">משמש להזרמת מוזיקה</string>
+    <string name="setting_aac">פרסם קודק AAC</string>
+    <string name="setting_aac_desc">משמש לשמע של שיקוף מסך</string>
+    <string name="setting_launch_on_connect">פתח את האפליקציה בחיבור</string>
+    <string name="setting_launch_on_connect_desc">הצג את המסך כשמשדר מתחבר</string>
+    <string name="setting_launch_on_connect_no_permission">לחץ כדי לאשר הצגה מעל אפליקציות אחרות</string>
+    <string name="setting_discovery">זמין דרך</string>
+    <string name="setting_discovery_all_desc">פרסום בכל הרשתות הזמינות</string>
+    <string name="setting_discovery_usb_desc">פרסום רק דרך חיבור USB</string>
+    <string name="chip_all_networks">כל הרשתות</string>
+    <string name="chip_usb_only">USB בלבד</string>
+    <string name="setting_resolution">רזולוציה</string>
+    <string name="setting_resolution_desc">הרזולוציה שמוצעת למכשיר המשדר</string>
+    <string name="setting_resolution_width">רוחב</string>
+    <string name="setting_resolution_height">גובה</string>
+    <string name="setting_max_fps">מקסימום FPS</string>
+    <string name="setting_max_fps_desc">קצב הפריימים המרבי שמוצע למשדר</string>
+    <string name="setting_overscanned">Overscan</string>
+    <string name="setting_overscanned_desc">הוסף שוליים לטלוויזיות שחותכות את קצה התמונה</string>
+    <string name="chip_custom">מותאם</string>
+    <string name="chip_device_portrait">לאורך</string>
+    <string name="chip_device_landscape">לרוחב</string>
+
+    <string name="setting_h265_desc">אוטומטי משתמש רק במפענחי H.265 שידוע שעובדים</string>
+    <string name="setting_enforce_sdr_desc">סמן וידאו כ-SDR; כבה כדי לאפשר HDR</string>
+    <string name="setting_sw_alac">כפה מפענח ALAC בתוכנה</string>
+    <string name="setting_sw_alac_desc">השתמש במפענח תוכנה במקום מפענח המערכת; עלול להוסיף השהיה</string>
+    <string name="setting_sw_aac">כפה מפענח AAC בתוכנה</string>
+    <string name="setting_sw_aac_desc">השתמש במפענח תוכנה במקום מפענח המערכת; עלול להוסיף השהיה</string>
+    <string name="setting_sync_client_volume">סנכרן עוצמה עם המשדר</string>
+    <string name="setting_sync_client_volume_desc">עוצמת הטלוויזיה תעקוב אחרי עוצמת האייפון</string>
+
+    <string name="setting_developer_options">אפשרויות מפתחים</string>
+    <string name="setting_developer_options_desc">הצג אפשרויות למשתמשים מתקדמים</string>
+    <string name="chip_auto">אוטומטי</string>
+    <string name="chip_on">פועל</string>
+    <string name="chip_off">כבוי</string>
+    <string name="setting_low_latency">השהיה נמוכה</string>
+    <string name="setting_low_latency_desc">פענוח שמע בהשהיה נמוכה; צורך יותר חשמל ומעבד</string>
+    <string name="setting_scheduled_output_buffer_release">סנכרון פריימים</string>
+    <string name="setting_scheduled_output_buffer_release_desc">תזמן כל פריים לרענון המסך המתאים</string>
+    <string name="setting_audio_delay">עקוף השהיית שמע</string>
+    <string name="setting_audio_delay_desc">קבע השהיית שמע מותאמת שמדווחת למשדר</string>
+    <string name="setting_audio_auto_buffer">חוצץ שמע אוטומטי</string>
+    <string name="setting_audio_auto_buffer_desc">כוונון אוטומטי של חוצץ השמע לפי הרשת והמכשיר</string>
+    <string-array name="audio_adaptive_step_names">
+        <item>השהיה הכי נמוכה</item>
+        <item>השהיה נמוכה</item>
+        <item>מאוזן</item>
+        <item>יציב יותר</item>
+        <item>הכי יציב</item>
+    </string-array>
+    <string name="setting_audio_cushion_ms">חוצץ שמע (מ״ש)</string>
+    <string name="setting_audio_cushion_ms_desc">קצר = פחות השהיה; ארוך = פחות קפיצות בשמע</string>
+    <string name="setting_oboe_buffer_frames">חוצץ פלט חומרה (פריימים)</string>
+    <string name="setting_oboe_buffer_frames_desc">השאר 0 לגודל אוטומטי</string>
+    <string name="setting_debug_overlay">הצג נתוני דיבאג</string>
+    <string name="setting_debug_overlay_desc">הצג על הווידאו קודק, FPS, קצב נתונים ונפילות</string>
+    <string name="setting_benchmark_log">רישום דיבאג</string>
+    <string name="setting_benchmark_log_desc">רשום נתוני זרם ל-logcat</string>
+
+    <string name="debug_section_video">וידאו</string>
+    <string name="debug_section_audio">שמע</string>
+    <string name="debug_section_network">רשת</string>
+    <string name="debug_clients">משדרים: %1$d</string>
+</resources>

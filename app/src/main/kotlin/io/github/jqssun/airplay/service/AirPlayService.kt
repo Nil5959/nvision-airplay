@@ -387,7 +387,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 0,
             audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 0
         )
-        nativeHandle = NativeBridge.nativeInit(this, hwAddr, effectiveName, keyFile, nohold, requirePin)
+        nativeHandle = NativeBridge.nativeInit(this, hwAddr, effectiveName, keyFile, nohold, requirePin, prefs[Prefs.PASSWORD])
         if (nativeHandle == 0L) {
             log("Native init failed")
             _failStart()

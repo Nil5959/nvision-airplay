@@ -47,7 +47,7 @@ JNIEXPORT jlong JNICALL
 Java_io_github_jqssun_airplay_bridge_NativeBridge_nativeInit(
         JNIEnv *env, jobject thiz,
         jobject callback, jbyteArray hwAddr, jstring name, jstring keyFile,
-        jboolean nohold, jboolean requirePin) {
+        jboolean nohold, jboolean requirePin, jstring password) {
 
     server_ctx_t *ctx = new server_ctx_t();
 
@@ -56,6 +56,11 @@ Java_io_github_jqssun_airplay_bridge_NativeBridge_nativeInit(
     env->GetByteArrayRegion(hwAddr, 0, hw_len, (jbyte *)ctx->hw_addr);
 
     android_callbacks_init(&ctx->cb_ctx, env, callback);
+    const char *pw_c = env->GetStringUTFChars(password, NULL);
+    snprintf(ctx->cb_ctx.password, sizeof(ctx->cb_ctx.password), "%s", pw_c ? pw_c : "");
+    env->ReleaseStringUTFChars(password, pw_c);
+    const int has_password = ctx->cb_ctx.password[0] != '\0';
+    if (has_password) requirePin = JNI_FALSE;
     ctx->cb_ctx.require_pin = requirePin ? 1 : 0;
     android_callbacks_fill(&ctx->callbacks, &ctx->cb_ctx);
 
@@ -97,7 +102,7 @@ Java_io_github_jqssun_airplay_bridge_NativeBridge_nativeInit(
 
     /* shim dnssd_init only builds txt records; kotlin does the actual nsd registration */
     int dns_err = 0;
-    unsigned char pin_pw = requirePin ? 1 : 0;
+    unsigned char pin_pw = has_password ? 2 : (requirePin ? 1 : 0);
     ctx->dnssd = dnssd_init(name_c, (int)strlen(name_c), ctx->hw_addr, 6, &dns_err, pin_pw);
     if (!ctx->dnssd) {
         LOGE("dnssd_init failed: %d", dns_err);

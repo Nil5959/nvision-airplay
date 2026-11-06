@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -636,13 +637,8 @@ private fun OverviewContent(
                 }
                 if (state != ServerState.RUNNING || connections == 0) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = if (connections > 0) Icons.Default.CastConnected else Icons.Default.Cast,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                        Spacer(Modifier.height(12.dp))
+                        NilLogo()
+                        Spacer(Modifier.height(18.dp))
                         Text(
                             text = if (grant) stringResource(R.string.local_network_desc) else when (state) {
                                 ServerState.STOPPED -> stringResource(R.string.server_stopped)
@@ -1114,3 +1110,25 @@ private fun debugOverlaySections(context: Context, info: DebugInfo): List<DebugS
 private fun formatDecode(meanUs: Int, maxUs: Int, held: Int, errors: Int): String =
     (if (meanUs == 0) "held=$held"
     else "%.1f/%.1f ms held=%d".format(meanUs / 1000.0, maxUs / 1000.0, held)) + " errs=$errors"
+
+
+@Composable
+private fun NilLogo() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Nil",
+            style = MaterialTheme.typography.displayLarge.copy(
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Light,
+                letterSpacing = (-1).sp,
+                brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(io.github.jqssun.airplay.ui.theme.NilMint, androidx.compose.ui.graphics.Color.White)
+                )
+            )
+        )
+        Text(
+            text = "AirPlay",
+            style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 6.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        )
+    }
+}

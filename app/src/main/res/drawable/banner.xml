@@ -5,7 +5,7 @@
     android:viewportHeight="180">
 
     <path
-        android:fillColor="#FFFFFF"
+        android:fillColor="#000000"
         android:pathData="M0,0h320v180H0z" />
 
     <group
@@ -21,18 +21,18 @@
                 android:translateX="16"
                 android:translateY="16">
                 <path
-                    android:fillColor="#C0C0C0"
+                    android:fillColor="#14806A"
                     android:pathData="m240,840 l240,-240 l240,240L240,840ZM80,680v-480q0,-33 23.5,-56.5T160,120h640q33,0 56.5,23.5T880,200v480q0,33 -23.5,56.5T800,760H680v-80h120v-480H160v480h120v80H160q-33,0 -56.5,-23.5T80,680Zm400,-200Z" />
             </group>
             <group
                 android:translateX="12"
                 android:translateY="12">
                 <path
-                    android:fillColor="#9E9E9E"
+                    android:fillColor="#1FA488"
                     android:pathData="m240,840 l240,-240 l240,240L240,840ZM80,680v-480q0,-33 23.5,-56.5T160,120h640q33,0 56.5,23.5T880,200v480q0,33 -23.5,56.5T800,760H680v-80h120v-480H160v480h120v80H160q-33,0 -56.5,-23.5T80,680Zm400,-200Z" />
             </group>
             <path
-                android:fillColor="#424242"
+                android:fillColor="#3DDBB4"
                 android:pathData="m240,840 l240,-240 l240,240L240,840ZM80,680v-480q0,-33 23.5,-56.5T160,120h640q33,0 56.5,23.5T880,200v480q0,33 -23.5,56.5T800,760H680v-80h120v-480H160v480h120v80H160q-33,0 -56.5,-23.5T80,680Zm400,-200Z" />
         </group>
     </group>
