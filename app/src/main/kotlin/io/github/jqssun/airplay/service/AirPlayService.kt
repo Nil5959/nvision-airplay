@@ -190,6 +190,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     var logCallback: ((String) -> Unit)? = null
 
     @Volatile private var _lastPin: String? = null
+    private val pinOverlay by lazy { PinOverlay(this) }
+    // open the app when media actually starts, not at TCP connect: a sender that still has to enter the
+    // on-screen code should see only the code over what is playing (N Vision)
+    @Volatile private var _launchPending = false
     var pinCallback: ((String?) -> Unit)? = null
         set(value) {
             field = value
@@ -387,7 +391,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 0,
             audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 0
         )
-        nativeHandle = NativeBridge.nativeInit(this, hwAddr, effectiveName, keyFile, nohold, requirePin, prefs[Prefs.PASSWORD])
+        nativeHandle = NativeBridge.nativeInit(this, hwAddr, effectiveName, keyFile, nohold, requirePin, "")  // fixed password dropped: on-screen code instead
         if (nativeHandle == 0L) {
             log("Native init failed")
             _failStart()
@@ -655,6 +659,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onVideoPlay(location: String, startPositionSeconds: Float) {
+        _onMediaStarted()
         _videoLocation.value = location
         _videoPlaySeq.value++
         _videoPollSuppressed = false
@@ -800,12 +805,13 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         val firstConnection = _connectionCount.value == 0
         _connectionCount.value++
         log("Sender connected (${_connectionCount.value})")
-        if (firstConnection && shouldLaunchOnConnect()) launchMainActivity()
+        if (firstConnection && shouldLaunchOnConnect()) _launchPending = true
     }
 
     override fun onConnectionDestroy() {
         _connectionCount.value = (_connectionCount.value - 1).coerceAtLeast(0)
         if (_connectionCount.value == 0) {
+            _launchPending = false
             // clients may drop without POST /stop; must run before the poll-state reset
             _endVideoPlayback("AirPlay Video stopped (disconnect)")
             // last client gone: release audio output devices to save power
@@ -842,6 +848,9 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         if (_lastPin == pin) return
         _lastPin = pin
         pinCallback?.invoke(pin)
+        val room = prefs[Prefs.SERVER_NAME].ifBlank { Prefs.SERVER_NAME.def }
+        // the code over whatever is on screen; without the overlay permission fall back to opening the app
+        _mainHandler.post { if (!pinOverlay.show(pin, room)) launchMainActivity() }
         _updateMediaNotification()
     }
 
@@ -1009,6 +1018,18 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         _lastPin = null
         pinCallback?.invoke(null)
         _updateMediaNotification()
+        _onMediaStarted()
+    }
+
+    /** The sender got through (media is flowing): "connected" on the code card, then open the app if due. */
+    private fun _onMediaStarted() {
+        _mainHandler.post {
+            if (pinOverlay.showing) pinOverlay.success()
+            if (_launchPending) {
+                _launchPending = false
+                launchMainActivity()
+            }
+        }
     }
 
     fun collectDebugInfo() = DebugInfo(

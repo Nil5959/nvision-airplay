@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pin_overlay_title">קוד AirPlay · %1$s</string>
+    <string name="pin_overlay_hint">להקליד את הקוד באייפון</string>
+    <string name="pin_overlay_ok">✓ מחובר</string>
+</resources>

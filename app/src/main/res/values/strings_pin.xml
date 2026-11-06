@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pin_overlay_title">AirPlay code · %1$s</string>
+    <string name="pin_overlay_hint">Enter this code on your iPhone</string>
+    <string name="pin_overlay_ok">✓ Connected</string>
+</resources>

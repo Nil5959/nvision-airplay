@@ -34,15 +34,230 @@ import io.github.jqssun.airplay.viewmodel.MainViewModel
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import kotlin.math.roundToInt
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import io.github.jqssun.airplay.ui.theme.AirPlayRing
+import io.github.jqssun.airplay.ui.theme.Inter
+import io.github.jqssun.airplay.ui.theme.TvFocusSurface
+import io.github.jqssun.airplay.ui.theme.TvMuted
+import io.github.jqssun.airplay.ui.theme.TvText
+import kotlinx.coroutines.launch
+
+// tvOS-style settings: short list on one side, AirPlay ring + version on the other.
+// Everything else lives under "Advanced" (AdvancedSettings below).
+@Composable
+fun SettingsScreen(viewModel: MainViewModel, onOpenLogs: () -> Unit = {}) {
+    var advanced by rememberSaveable { mutableStateOf(false) }
+    var backFromAdvanced by remember { mutableStateOf(false) }
+    BackHandler(enabled = advanced) { advanced = false; backFromAdvanced = true }
+    val ctx = LocalContext.current
+    val version = remember(ctx) {
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull().orEmpty()
+    }
+    val listWeight = if (advanced) 0.6f else 0.42f
+    Row(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+        Box(modifier = Modifier.weight(listWeight).fillMaxHeight()) {
+            if (advanced) {
+                val first = remember { FocusRequester() }
+                LaunchedEffect(Unit) { first.requestFocusUntilLanded() }
+                TransparentSurface { AdvancedSettings(viewModel, onOpenLogs, first) }
+            } else {
+                MainSettingsList(viewModel, focusAdvanced = backFromAdvanced, onAdvanced = { advanced = true })
+            }
+        }
+        Column(
+            modifier = Modifier.weight(1f - listWeight).fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            AirPlayRing(size = 150.dp, breathe = false)
+            Spacer(Modifier.height(24.dp))
+            Text("AirPlay", fontFamily = Inter, fontWeight = FontWeight.Light, fontSize = 40.sp, color = TvText)
+            Spacer(Modifier.height(6.dp))
+            Text(stringResource(R.string.settings_version, version), fontSize = 16.sp, color = TvMuted)
+        }
+    }
+}
+
+private enum class Editor { NAME, RESOLUTION, AUDIO_DELAY }
 
 @Composable
-fun SettingsScreen(viewModel: MainViewModel) {
+private fun MainSettingsList(viewModel: MainViewModel, focusAdvanced: Boolean, onAdvanced: () -> Unit) {
     val serverName by viewModel.pref(Prefs.SERVER_NAME).collectAsState()
+    val bootAutoStart by viewModel.pref(Prefs.BOOT_AUTO_START).collectAsState()
+    val requirePin by viewModel.pref(Prefs.REQUIRE_PIN).collectAsState()
+    val resolution by viewModel.pref(Prefs.RESOLUTION).collectAsState()
+    val audioLatencyMs by viewModel.pref(Prefs.AUDIO_LATENCY_MS).collectAsState()
+    var editor by remember { mutableStateOf<Editor?>(null) }
+    val nameFocus = remember { FocusRequester() }
+    val resFocus = remember { FocusRequester() }
+    val delayFocus = remember { FocusRequester() }
+    val advancedFocus = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { (if (focusAdvanced) advancedFocus else nameFocus).requestFocusUntilLanded() }
+    fun closeEditor() {
+        val back = when (editor) {
+            Editor.NAME -> nameFocus
+            Editor.RESOLUTION -> resFocus
+            Editor.AUDIO_DELAY -> delayFocus
+            null -> null
+        }
+        editor = null
+        back?.let { scope.launch { it.requestFocusUntilLanded() } }
+    }
+    val on = stringResource(R.string.chip_on)
+    val off = stringResource(R.string.chip_off)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            // room for the focus scale + shadow, which the scroll container would clip
+            .padding(start = 32.dp, end = 32.dp, top = 56.dp, bottom = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        SectionHeader(stringResource(R.string.settings_group_general))
+        TvRow(stringResource(R.string.settings_room_name), serverName, Modifier.focusRequester(nameFocus)) {
+            editor = Editor.NAME
+        }
+        TvRow(stringResource(R.string.settings_start_with_tv), if (bootAutoStart) on else off) {
+            viewModel.set(Prefs.BOOT_AUTO_START, !bootAutoStart)
+        }
+        TvRow(stringResource(R.string.settings_pin_on_screen), if (requirePin) on else off) {
+            viewModel.set(Prefs.REQUIRE_PIN, !requirePin)
+        }
+        SectionHeader(stringResource(R.string.settings_group_picture_sound))
+        val resolutionLabel = when (resolution) {
+            Prefs.AUTO -> stringResource(R.string.chip_auto)
+            Prefs.PORTRAIT -> stringResource(R.string.chip_device_portrait)
+            Prefs.LANDSCAPE -> stringResource(R.string.chip_device_landscape)
+            else -> resolution
+        }
+        TvRow(stringResource(R.string.setting_resolution), resolutionLabel, Modifier.focusRequester(resFocus)) {
+            editor = Editor.RESOLUTION
+        }
+        TvRow(
+            stringResource(R.string.settings_audio_delay),
+            if (audioLatencyMs < 0) stringResource(R.string.chip_auto)
+            else stringResource(R.string.audio_delay_value, audioLatencyMs),
+            Modifier.focusRequester(delayFocus)
+        ) { editor = Editor.AUDIO_DELAY }
+        Spacer(Modifier.height(10.dp))
+        TvRow(stringResource(R.string.settings_advanced), "›", Modifier.focusRequester(advancedFocus), onClick = onAdvanced)
+    }
+
+    when (editor) {
+        Editor.NAME -> {
+            var text by remember { mutableStateOf(serverName) }
+            val commit = {
+                if (text.isNotBlank() && text != serverName) viewModel.set(Prefs.SERVER_NAME, text.trim())
+                closeEditor()
+            }
+            EditorDialog(stringResource(R.string.settings_room_name), ::closeEditor, onOk = commit) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = doneAndHide { commit() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+        Editor.RESOLUTION -> EditorDialog(stringResource(R.string.setting_resolution), ::closeEditor) {
+            SettingResolution(value = resolution, onValueChange = { viewModel.set(Prefs.RESOLUTION, it) })
+        }
+        Editor.AUDIO_DELAY -> EditorDialog(stringResource(R.string.settings_audio_delay), ::closeEditor) {
+            Column { AudioDelayEditor(viewModel, audioLatencyMs) }
+        }
+        null -> {}
+    }
+}
+
+@Composable
+private fun EditorDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    onOk: () -> Unit = onDismiss,
+    content: @Composable () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { TransparentSurface(content) },
+        confirmButton = {
+            TextButton(onClick = onOk, modifier = Modifier.dpadFocus()) { Text(stringResource(R.string.btn_ok)) }
+        }
+    )
+}
+
+// existing Material rows paint colorScheme.surface; let the backdrop show through instead
+@Composable
+private fun TransparentSurface(content: @Composable () -> Unit) {
+    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(surface = Color.Transparent), content = content)
+}
+
+/** tvOS settings row: label on one side, current value in grey on the other; white when focused. */
+@Composable
+private fun TvRow(label: String, value: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    TvFocusSurface(onClick = onClick, shape = RoundedCornerShape(12.dp), modifier = modifier.fillMaxWidth(), focusedScale = 1.04f) { focused ->
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(16.dp))
+            Text(
+                value, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = if (focused) Color(0xFF636366) else TvMuted
+            )
+        }
+    }
+}
+
+@Composable
+private fun AudioDelayEditor(viewModel: MainViewModel, audioLatencyMs: Int) {
+    SettingSwitch(
+        title = stringResource(R.string.setting_audio_delay),
+        description = stringResource(R.string.setting_audio_delay_desc),
+        checked = audioLatencyMs >= 0,
+        onCheckedChange = { viewModel.set(Prefs.AUDIO_LATENCY_MS, if (it) 250 else -1) }
+    )
+
+    if (audioLatencyMs >= 0) {
+        var sliderVal by remember(audioLatencyMs) { mutableFloatStateOf(audioLatencyMs.toFloat()) }
+        ListItem(
+            headlineContent = {
+                Slider(
+                    value = sliderVal,
+                    onValueChange = { sliderVal = it },
+                    onValueChangeFinished = { viewModel.set(Prefs.AUDIO_LATENCY_MS, sliderVal.roundToInt()) },
+                    valueRange = 0f..1000f,
+                    steps = 19,
+                    modifier = Modifier.dpadFocus().dpadAdjust(
+                        onLeft = { viewModel.set(Prefs.AUDIO_LATENCY_MS, (audioLatencyMs - 50).coerceIn(0, 1000)) },
+                        onRight = { viewModel.set(Prefs.AUDIO_LATENCY_MS, (audioLatencyMs + 50).coerceIn(0, 1000)) }
+                    )
+                )
+            },
+            trailingContent = { Text(stringResource(R.string.audio_delay_value, sliderVal.roundToInt())) }
+        )
+    }
+}
+
+@Composable
+private fun AdvancedSettings(viewModel: MainViewModel, onOpenLogs: () -> Unit, firstFocus: FocusRequester) {
     val h265 by viewModel.pref(Prefs.H265).collectAsState()
     val enforceSdr by viewModel.pref(Prefs.ENFORCE_SDR).collectAsState()
     val alacEnabled by viewModel.pref(Prefs.ALAC_ENABLED).collectAsState()
     val aacEnabled by viewModel.pref(Prefs.AAC_ENABLED).collectAsState()
-    val resolution by viewModel.pref(Prefs.RESOLUTION).collectAsState()
     val idlePreview by viewModel.pref(Prefs.IDLE_PREVIEW).collectAsState()
     val autoFullscreen by viewModel.pref(Prefs.AUTO_FULLSCREEN).collectAsState()
     val keepScreenOn by viewModel.pref(Prefs.KEEP_SCREEN_ON).collectAsState()
@@ -52,15 +267,11 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val launchOnConnect by viewModel.pref(Prefs.LAUNCH_ON_CONNECT).collectAsState()
     val maxFps by viewModel.pref(Prefs.MAX_FPS).collectAsState()
     val overscanned by viewModel.pref(Prefs.OVERSCANNED).collectAsState()
-    val requirePin by viewModel.pref(Prefs.REQUIRE_PIN).collectAsState()
-    val password by viewModel.pref(Prefs.PASSWORD).collectAsState()
     val allowNewConn by viewModel.pref(Prefs.ALLOW_NEW_CONN).collectAsState()
     val usbOnly by viewModel.pref(Prefs.USB_ONLY).collectAsState()
     val autoStart by viewModel.pref(Prefs.AUTO_START).collectAsState()
-    val bootAutoStart by viewModel.pref(Prefs.BOOT_AUTO_START).collectAsState()
     val runInBackground by viewModel.pref(Prefs.RUN_IN_BACKGROUND).collectAsState()
     val serverPort by viewModel.pref(Prefs.SERVER_PORT).collectAsState()
-    val audioLatencyMs by viewModel.pref(Prefs.AUDIO_LATENCY_MS).collectAsState()
     val forceSwAlac by viewModel.pref(Prefs.FORCE_SW_ALAC).collectAsState()
     val forceSwAac by viewModel.pref(Prefs.FORCE_SW_AAC).collectAsState()
     val syncClientVolume by viewModel.pref(Prefs.SYNC_CLIENT_VOLUME).collectAsState()
@@ -86,28 +297,24 @@ fun SettingsScreen(viewModel: MainViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(vertical = 8.dp)
+            .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 32.dp)
     ) {
-        SectionHeader(stringResource(R.string.section_server))
+        SectionHeader(stringResource(R.string.settings_advanced))
 
-        SettingTextField(
-            label = stringResource(R.string.setting_server_name),
-            value = serverName,
-            onCommit = { viewModel.set(Prefs.SERVER_NAME, it) }
+        TvRow(
+            label = stringResource(R.string.tab_logs),
+            value = "›",
+            modifier = Modifier.focusRequester(firstFocus),
+            onClick = onOpenLogs
         )
+
+        SectionHeader(stringResource(R.string.section_server))
 
         SettingTextField(
             label = stringResource(R.string.setting_server_port),
             value = serverPort.toString(),
             onCommit = { viewModel.set(Prefs.SERVER_PORT, it.toInt()) },
             range = Prefs.SERVER_PORT.range
-        )
-
-        SettingSwitch(
-            title = stringResource(R.string.setting_boot_auto_start),
-            description = stringResource(R.string.setting_boot_auto_start_desc),
-            checked = bootAutoStart,
-            onCheckedChange = { viewModel.set(Prefs.BOOT_AUTO_START, it) }
         )
 
         SettingSwitch(
@@ -128,20 +335,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 true to stringResource(R.string.chip_usb_only),
             ),
             onValueChange = { viewModel.set(Prefs.USB_ONLY, it) }
-        )
-
-        SettingTextField(
-            label = stringResource(R.string.setting_password),
-            value = password,
-            description = stringResource(R.string.setting_password_desc),
-            onCommit = { viewModel.set(Prefs.PASSWORD, it.take(64)) }
-        )
-
-        SettingSwitch(
-            title = stringResource(R.string.setting_require_pin),
-            description = stringResource(R.string.setting_require_pin_desc),
-            checked = requirePin,
-            onCheckedChange = { viewModel.set(Prefs.REQUIRE_PIN, it) }
         )
 
         SettingSwitch(
@@ -193,11 +386,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
             description = stringResource(R.string.setting_auto_fullscreen_desc),
             checked = autoFullscreen,
             onCheckedChange = { viewModel.set(Prefs.AUTO_FULLSCREEN, it) }
-        )
-
-        SettingResolution(
-            value = resolution,
-            onValueChange = { viewModel.set(Prefs.RESOLUTION, it) }
         )
 
         SettingChipField(
@@ -358,33 +546,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
             )
 
             SettingSwitch(
-                title = stringResource(R.string.setting_audio_delay),
-                description = stringResource(R.string.setting_audio_delay_desc),
-                checked = audioLatencyMs >= 0,
-                onCheckedChange = { viewModel.set(Prefs.AUDIO_LATENCY_MS, if (it) 250 else -1) }
-            )
-
-            if (audioLatencyMs >= 0) {
-                var sliderVal by remember(audioLatencyMs) { mutableFloatStateOf(audioLatencyMs.toFloat()) }
-                ListItem(
-                    headlineContent = {
-                        Slider(
-                            value = sliderVal,
-                            onValueChange = { sliderVal = it },
-                            onValueChangeFinished = { viewModel.set(Prefs.AUDIO_LATENCY_MS, sliderVal.roundToInt()) },
-                            valueRange = 0f..1000f,
-                            steps = 19,
-                            modifier = Modifier.dpadFocus().dpadAdjust(
-                                onLeft = { viewModel.set(Prefs.AUDIO_LATENCY_MS, (audioLatencyMs - 50).coerceIn(0, 1000)) },
-                                onRight = { viewModel.set(Prefs.AUDIO_LATENCY_MS, (audioLatencyMs + 50).coerceIn(0, 1000)) }
-                            )
-                        )
-                    },
-                    trailingContent = { Text(stringResource(R.string.audio_delay_value, sliderVal.roundToInt())) }
-                )
-            }
-
-            SettingSwitch(
                 title = stringResource(R.string.setting_audio_auto_buffer),
                 description = stringResource(R.string.setting_audio_auto_buffer_desc),
                 checked = audioAutoBuffer,
@@ -468,9 +629,9 @@ private fun _openOverlaySettings(ctx: Context) {
 private fun SectionHeader(title: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        fontSize = 15.sp,
+        color = TvMuted,
+        modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 18.dp, bottom = 8.dp)
     )
 }
 

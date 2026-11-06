@@ -203,4 +203,19 @@
     <string name="debug_audio_glitch">Glitch: trim=%1$d drop=%2$d sil=%3$d ur=%4$d xrun=%5$d</string>
     <string name="debug_audio_decode">Decode: %1$s</string>
     <string name="debug_clients">Senders: %1$d</string>
+
+    <!-- tvOS-style idle + settings -->
+    <string name="status_on">AirPlay on</string>
+    <string name="status_off">AirPlay off</string>
+    <string name="idle_how_prefix">On iPhone:</string>
+    <string name="idle_how_path">Control Center → Screen Mirroring → %1$s</string>
+    <string name="idle_press_to_start">Select “AirPlay off” to start</string>
+    <string name="settings_group_general">General</string>
+    <string name="settings_group_picture_sound">Picture &amp; Sound</string>
+    <string name="settings_room_name">Room name</string>
+    <string name="settings_start_with_tv">Start with the TV</string>
+    <string name="settings_pin_on_screen">Code on screen</string>
+    <string name="settings_audio_delay">Audio delay</string>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_version">N Vision AirPlay · Version %1$s</string>
 </resources>

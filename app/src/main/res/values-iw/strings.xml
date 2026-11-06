@@ -165,4 +165,19 @@
     <string name="debug_section_audio">שמע</string>
     <string name="debug_section_network">רשת</string>
     <string name="debug_clients">משדרים: %1$d</string>
+
+    <!-- tvOS-style idle + settings -->
+    <string name="status_on">AirPlay פועל</string>
+    <string name="status_off">AirPlay כבוי</string>
+    <string name="idle_how_prefix">באייפון:</string>
+    <string name="idle_how_path">מרכז הבקרה ← שיקוף מסך ← %1$s</string>
+    <string name="idle_press_to_start">לבחור ב-״AirPlay כבוי״ כדי להפעיל</string>
+    <string name="settings_group_general">כללי</string>
+    <string name="settings_group_picture_sound">תמונה וקול</string>
+    <string name="settings_room_name">שם החדר</string>
+    <string name="settings_start_with_tv">להפעיל עם הטלוויזיה</string>
+    <string name="settings_pin_on_screen">קוד על המסך</string>
+    <string name="settings_audio_delay">השהיית קול</string>
+    <string name="settings_advanced">מתקדם</string>
+    <string name="settings_version">N Vision AirPlay · גרסה %1$s</string>
 </resources>
