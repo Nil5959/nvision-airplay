@@ -1,4 +1,12 @@
-# AirPlay Receiver for Android
+# AirPlay Receiver for Android (Nil's fork)
+
+> Fork of [jqssun/android-airplay-server](https://github.com/jqssun/android-airplay-server) (GPL-3.0), all credit to the upstream author and to [UxPlay](https://github.com/FDH2/UxPlay).
+> Changes in this fork:
+> - When the last AirPlay sender disconnects, the receiver screen closes and the TV returns to the app that was open before.
+> - Release builds fall back to the local debug key when no release keystore is set, and are built for `armeabi-v7a` and `arm64-v8a` only (Android TV boxes).
+>
+> Ready APKs are on this fork's [Releases](https://github.com/Nil5959/android-airplay-server/releases) page. The rest of this README is upstream's.
+
 
 [![Stars](https://img.shields.io/github/stars/jqssun/android-airplay-server)](https://github.com/jqssun/android-airplay-server)
 [![GitHub](https://img.shields.io/github/downloads/jqssun/android-airplay-server/total?label=GitHub&logo=GitHub)](https://github.com/jqssun/android-airplay-server/releases)

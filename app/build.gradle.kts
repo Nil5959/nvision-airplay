@@ -57,8 +57,8 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfigs.findByName("release")?.let { signingConfig = it }
-            ndk { abiFilters += allAbis }
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
         }
         // debuggable build with HWASan (arm64) + UBSan in native code
         create("sanitize") {

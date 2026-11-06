@@ -95,6 +95,17 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // return to the previous app once the last AirPlay sender disconnects
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                var hadSender = false
+                viewModel.connectionCount.collect { conns ->
+                    if (conns > 0) hadSender = true
+                    else if (hadSender) { hadSender = false; finish() }
+                }
+            }
+        }
+
         // auto-enter pre-declared in pip params
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             lifecycleScope.launch {
