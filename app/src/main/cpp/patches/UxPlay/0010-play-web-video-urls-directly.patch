@@ -1,0 +1,25 @@
+--- a/lib/http_handlers.h
++++ b/lib/http_handlers.h
+@@ -945,7 +945,11 @@
+ 
+     /* we only support HLS if the playback location is terminated by "/master.m3u8" */
+     const char *uri_suffix = strstr(playback_location, "/master.m3u8");
+-    if (uri_suffix) {
++    /* a plain http(s) url (Safari / web players: https://cdn/.../master.m3u8?token) is played directly;
++       only the sender-proxied form (YouTube's mlhls://localhost/master.m3u8) is fetched over FCUP */
++    const bool direct_url = !strncmp(playback_location, "http://", strlen("http://")) ||
++                            !strncmp(playback_location, "https://", strlen("https://"));
++    if (uri_suffix && !direct_url) {
+         size_t len = strlen(get_uri_local_prefix(airplay_video)) + strlen(uri_suffix);
+         char *location = (char *) calloc(len + 1, sizeof(char));
+         if (!location) {
+@@ -1034,7 +1038,8 @@
+     }
+     airplay_video_t *airplay_video = (airplay_video_t *) hls_get_current_video(raop);
+     assert(airplay_video);
+-    if (!strcmp(url, "/master.m3u8")){
++    /* Safari and other web players append a query (?validfrom=..&hash=..) to the master playlist uri */
++    if (!strncmp(url, "/master.m3u8", 12) && (url[12] == '\0' || url[12] == '?')) {
+         char * master_playlist  = get_master_playlist(airplay_video);
+         if (master_playlist) {
+             *response_data = master_playlist;

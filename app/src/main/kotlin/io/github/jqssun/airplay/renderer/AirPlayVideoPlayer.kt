@@ -12,7 +12,9 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.VideoSize
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
 // rate is 0 while buffering; speed is the configured rate regardless of pause state
 // native reads the effective rate, overlay reads playWhenReady + speed + skipSilence
@@ -28,6 +30,8 @@ data class PlaybackSnapshot(
 )
 
 // exoplayer calls stay on the main thread; native only reads the onPlaybackInfo snapshot
+private const val APPLE_TV_UA = "AppleCoreMedia/1.0.0.21K69 (Apple TV; U; CPU OS 17_0 like Mac OS X; en_us)"
+
 class AirPlayVideoPlayer(private val context: Context) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -50,6 +54,10 @@ class AirPlayVideoPlayer(private val context: Context) {
     private val _listener = object : Player.Listener {
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             Log.w(TAG, "playback error", error)
+            (error.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.let { e ->
+                Log.w(TAG, "HTTP ${e.responseCode} for ${e.dataSpec.uri} headers=${e.headerFields.filterKeys { it != null }} " +
+                    "sent=${e.dataSpec.httpRequestHeaders} cookies=${(java.net.CookieHandler.getDefault() as? java.net.CookieManager)?.cookieStore?.cookies?.map { it.name + "@" + it.domain }}")
+            }
             onEnded?.invoke()
         }
         override fun onPlaybackStateChanged(state: Int) {
@@ -72,7 +80,15 @@ class AirPlayVideoPlayer(private val context: Context) {
     fun play(location: String, startPositionSeconds: Float) = mainHandler.post {
         // recycling must not report the stopped sentinel: senders poll right after /play
         _stopInternal(reportStopped = false)
-        val p = ExoPlayer.Builder(context).build().also {
+        // fetch web video urls (Safari) as an Apple TV would: CDNs that sign their urls often refuse other players (403).
+        // Akamai-style tokens (?hdnea=) answer the playlist with a cookie that every segment must send back.
+        if (java.net.CookieHandler.getDefault() == null) {
+            java.net.CookieHandler.setDefault(java.net.CookieManager(null, java.net.CookiePolicy.ACCEPT_ALL))
+        }
+        val http = DefaultHttpDataSource.Factory()
+            .setUserAgent(APPLE_TV_UA)
+            .setAllowCrossProtocolRedirects(true)
+        val p = ExoPlayer.Builder(context).setMediaSourceFactory(DefaultMediaSourceFactory(http)).build().also {
             it.addListener(_listener)
             pendingSurface?.let { s -> it.setVideoSurface(s) }
             it.volume = clientGain
