@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Nil AirPlay</string>
+    <string name="app_name">N Vision AirPlay</string>
 
     <string name="notification_channel">שירות AirPlay</string>
     <string name="notification_title">AirPlay פועל</string>

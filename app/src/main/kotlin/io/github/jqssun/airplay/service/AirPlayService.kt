@@ -460,6 +460,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         }
 
         _serverState.value = ServerState.RUNNING
+        _setLauncherIcon(true)
         if (ensureServiceStarted) {
             ContextCompat.startForegroundService(this, Intent(this, AirPlayService::class.java))
         }
@@ -511,6 +512,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         wakeLock?.release()
         wakeLock = null
         _serverState.value = ServerState.ERROR
+        _setLauncherIcon(false)
         if (foregroundStarted) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             foregroundStarted = false
@@ -559,6 +561,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         _positionMs.value = 0
         _durationMs.value = 0
         _serverState.value = ServerState.STOPPED
+        _setLauncherIcon(false)
         _connectionCount.value = 0
         _clientVol = null
         _clientVolDriveEnd()
@@ -1140,6 +1143,25 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             }
         }
         return builder.build()
+    }
+
+    // swap the launcher alias so the home-screen icon is green only while the server runs
+    private fun _setLauncherIcon(running: Boolean) {
+        val pm = packageManager
+        fun set(alias: String, on: Boolean) {
+            val cn = android.content.ComponentName(this, "$packageName.$alias")
+            val want = if (on) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            if (pm.getComponentEnabledSetting(cn) != want) {
+                pm.setComponentEnabledSetting(cn, want, android.content.pm.PackageManager.DONT_KILL_APP)
+            }
+        }
+        try {
+            set("LauncherOn", running)
+            set("LauncherOff", !running)
+        } catch (e: Exception) {
+            Log.w(TAG, "launcher icon swap failed", e)
+        }
     }
 
     private fun launchMainActivity() {

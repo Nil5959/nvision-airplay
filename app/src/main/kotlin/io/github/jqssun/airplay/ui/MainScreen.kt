@@ -1115,20 +1115,41 @@ private fun formatDecode(meanUs: Int, maxUs: Int, held: Int, errors: Int): Strin
 @Composable
 private fun NilLogo() {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "Nil",
-            style = MaterialTheme.typography.displayLarge.copy(
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Light,
-                letterSpacing = (-1).sp,
-                brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                    listOf(io.github.jqssun.airplay.ui.theme.NilMint, androidx.compose.ui.graphics.Color.White)
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(R.drawable.nv_mark),
+            contentDescription = "N Vision",
+            modifier = Modifier.size(88.dp)
+        )
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = "N",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold, letterSpacing = 2.sp
+                ),
+                color = androidx.compose.ui.graphics.Color.White
+            )
+            Text(
+                text = " VISION",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Light, letterSpacing = 6.sp
+                ),
+                color = androidx.compose.ui.graphics.Color.White
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Box(
+            Modifier.size(width = 120.dp, height = 3.dp).clip(RoundedCornerShape(2.dp)).background(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(
+                    listOf(io.github.jqssun.airplay.ui.theme.NvGreen, io.github.jqssun.airplay.ui.theme.NvCyan, io.github.jqssun.airplay.ui.theme.NvBlue)
                 )
             )
         )
+        Spacer(Modifier.height(8.dp))
         Text(
             text = "AirPlay",
-            style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 6.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            style = MaterialTheme.typography.titleSmall.copy(letterSpacing = 4.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
