@@ -131,6 +131,51 @@ class PinOverlay(private val ctx: Context) {
         return true
     }
 
+    /** A short note over the picture (e.g. a web video the TV may not play), gone after a few seconds. Any thread. */
+    fun notice(title: String, body: String) = main.post {
+        if (!canShow()) return@post
+        hideNow()
+        val w = ctx.resources.displayMetrics.widthPixels.toFloat()
+        fun px(f: Float) = (w * f).toInt()
+        val card = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(px(.024f), px(.02f), px(.024f), px(.02f))
+            background = GradientDrawable().apply {
+                cornerRadius = w * .02f
+                setColor(Color.argb(240, 44, 44, 46))
+                setStroke(1, Color.argb(30, 255, 255, 255))
+            }
+            alpha = 0f; scaleX = .94f; scaleY = .94f; translationY = -w * .02f
+        }
+        val head = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        head.addView(ImageView(ctx).apply { setImageResource(R.drawable.ic_air_fg_off) }, LinearLayout.LayoutParams(px(.024f), px(.024f)))
+        head.addView(TextView(ctx).apply {
+            text = title; setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_PX, w * .016f)
+            paint.isFakeBoldText = true; setPadding(px(.008f), 0, px(.008f), 0)
+        })
+        card.addView(head)
+        card.addView(TextView(ctx).apply {
+            text = body; gravity = Gravity.CENTER
+            setTextColor(Color.argb(190, 235, 235, 245)); setTextSize(TypedValue.COMPLEX_UNIT_PX, w * .013f)
+            setPadding(0, px(.008f), 0, 0)
+        })
+        val frame = FrameLayout(ctx)
+        frame.addView(card, FrameLayout.LayoutParams(px(.42f), -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = px(.04f) })
+        @Suppress("DEPRECATION")
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                   else WindowManager.LayoutParams.TYPE_PHONE
+        val lp = WindowManager.LayoutParams(-1, -1, type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.TRANSLUCENT)
+        try { wm.addView(frame, lp) } catch (e: Exception) { Log.w("PinOverlay", "notice failed", e); return@post }
+        root = frame
+        card.animate().alpha(1f).scaleX(1f).scaleY(1f).translationY(0f)
+            .setInterpolator(OvershootInterpolator(1.2f)).setDuration(600).start()
+        main.removeCallbacks(timeout)
+        main.postDelayed(timeout, 7_000)
+    }
+
     /** The iPhone was accepted: "connected", then fade away. Main thread. */
     fun success() {
         val row = digitsRow ?: return

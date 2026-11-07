@@ -427,6 +427,8 @@ fun MainScreen(
                     exit = androidx.compose.animation.fadeOut(),
                     modifier = Modifier.align(Alignment.TopCenter)
                 ) {
+                    val qualityHeights by io.github.jqssun.airplay.renderer.VideoQuality.heights.collectAsState()
+                    val qualityPinned by io.github.jqssun.airplay.renderer.VideoQuality.pinned.collectAsState()
                     VideoControlsTop(
                         title = videoTitle,
                         videoUrl = videoLocation,
@@ -437,7 +439,10 @@ fun MainScreen(
                             overlayVisible = false
                             showSpeedSelector = true
                         },
-                        onDownloadClick = { viewModel.toggleVideoDownload() }
+                        onDownloadClick = { viewModel.toggleVideoDownload() },
+                        qualities = qualityHeights,
+                        qualityPinned = qualityPinned,
+                        onQualitySelect = { viewModel.setVideoQuality(it) },
                     )
                 }
                 androidx.compose.animation.AnimatedVisibility(

@@ -34,6 +34,8 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
+
 
     private val viewModel: MainViewModel by viewModels()
     private var service: AirPlayService? = null

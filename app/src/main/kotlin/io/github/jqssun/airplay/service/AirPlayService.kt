@@ -32,6 +32,7 @@ import androidx.core.os.ConfigurationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import androidx.media.app.NotificationCompat as MediaNotificationCompat
+import io.github.jqssun.airplay.AppLanguage
 import io.github.jqssun.airplay.MainActivity
 import io.github.jqssun.airplay.Prefs
 import io.github.jqssun.airplay.R
@@ -77,6 +78,8 @@ data class VideoPlaybackInfo(
 )
 
 class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
+    override fun attachBaseContext(newBase: android.content.Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
+
 
     private var nativeHandle = 0L
     private var nsdManager: NsdServiceManager? = null
@@ -194,6 +197,8 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     // open the app when media actually starts, not at TCP connect: a sender that still has to enter the
     // on-screen code should see only the code over what is playing (N Vision)
     @Volatile private var _launchPending = false
+    @Volatile private var _videoStartedAt = 0L
+
     var pinCallback: ((String?) -> Unit)? = null
         set(value) {
             field = value
@@ -315,6 +320,13 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         }
         airPlayVideoPlayer.onTitle = { _videoTitle.value = it ?: "" }
         airPlayVideoPlayer.onEnded = { _endVideoPlayback("AirPlay Video stopped (player)") }
+        // the TV could not play it (site blocked, unsupported): fail the held /play, so the sender keeps the
+        // video on the phone and its screen mirroring shows it
+        airPlayVideoPlayer.onFailed = {
+            // the site refuses the TV (Cloudflare check, signed urls) or the format is unsupported: no crash, a short
+            // note on screen; the video is dropped here and the phone can play it itself. The next video tries again.
+            pinOverlay.notice(getString(R.string.web_video_failed_title), getString(R.string.web_video_failed_body))
+        }
         airPlayVideoPlayer.onPlaybackInfo = { snapshot ->
             if (nativeHandle != 0L) {
                 NativeBridge.nativeUpdatePlaybackInfo(nativeHandle, snapshot.position, snapshot.duration, snapshot.rate, snapshot.ready)
@@ -659,6 +671,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onVideoPlay(location: String, startPositionSeconds: Float) {
+        _videoStartedAt = SystemClock.elapsedRealtime()
         _onMediaStarted()
         _videoLocation.value = location
         _videoPlaySeq.value++
@@ -897,6 +910,12 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onMirrorRunning(running: Boolean) {
+        log("mirror running=$running video=${_videoPlaybackActive.value} sinceVideoMs=${SystemClock.elapsedRealtime() - _videoStartedAt}")
+        // the sender closed the web video and went back to screen mirroring without a /stop:
+        // end the video so the mirror shows again (ignore the first seconds, when the hand-off is still settling)
+        if (running && _videoPlaybackActive.value && SystemClock.elapsedRealtime() - _videoStartedAt > 3000) {
+            _mainHandler.post { _endVideoPlayback("AirPlay Video stopped (back to mirroring)") }
+        }
         if (running) videoRenderer.startSession() else {
             videoRenderer.stopSession()
             _mirroringActive.value = false

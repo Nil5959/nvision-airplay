@@ -102,6 +102,7 @@ object Prefs {
     val OVERSCANNED = bool("overscanned", false, restart = true)
     val REQUIRE_PIN = bool("require_pin", true, restart = true)  // N Vision: on-screen code by default
     val PASSWORD = str("airplay_password", "", restart = true) { it.length <= 64 }
+    val LANGUAGE = str("app_language", "he") { it.length <= 16 }   // N Vision: Hebrew unless set to "system" or a tag
     val ALLOW_NEW_CONN = bool("allow_new_conn", true, restart = true)
     val AUDIO_LATENCY_MS = int("audio_latency_ms", -1, -1..1000, restart = true)
     val DEBUG_ENABLED = bool("debug_enabled", false)

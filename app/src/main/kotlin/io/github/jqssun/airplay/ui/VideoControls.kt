@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -178,6 +179,9 @@ fun VideoControlsTop(
     onBackClick: () -> Unit,
     onSpeedClick: () -> Unit,
     onDownloadClick: () -> Unit,
+    qualities: List<Int> = emptyList(),
+    qualityPinned: Int? = null,
+    onQualitySelect: (Int?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout).asPaddingValues()
@@ -211,6 +215,25 @@ fun VideoControlsTop(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (qualities.isNotEmpty()) {
+                // quality dropdown: Auto, then every height the stream offers
+                var open by remember { mutableStateOf(false) }
+                val auto = stringResource(R.string.quality_auto)
+                Box {
+                    PlayerButton(onClick = { open = true }, modifier = Modifier.width(96.dp)) {
+                        Text(qualityPinned?.let { "${it}p" } ?: auto, color = Color.White,
+                            style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                        (listOf<Int?>(null) + qualities).forEach { h ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text((h?.let { "${it}p" } ?: auto) + if (h == qualityPinned) "  ✓" else "") },
+                                onClick = { open = false; onQualitySelect(h) },
+                            )
+                        }
+                    }
+                }
+            }
             PlayerButton(onClick = onSpeedClick) {
                 Icon(Icons.Rounded.Speed, contentDescription = stringResource(R.string.select_playback_speed))
             }

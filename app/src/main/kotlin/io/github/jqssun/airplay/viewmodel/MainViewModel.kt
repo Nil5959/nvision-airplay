@@ -343,6 +343,10 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
         service?.stopVideoPlayback()
     }
 
+    fun setVideoQuality(height: Int?) {
+        service?.airPlayVideoPlayer?.setQuality(height)
+    }
+
     fun setVideoSpeed(speed: Float) {
         val value = speed.coerceIn(0.2f, 4f)
         _videoSpeed.value = value

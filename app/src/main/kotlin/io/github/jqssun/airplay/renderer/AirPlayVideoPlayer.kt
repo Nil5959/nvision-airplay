@@ -30,6 +30,12 @@ data class PlaybackSnapshot(
 )
 
 // exoplayer calls stay on the main thread; native only reads the onPlaybackInfo snapshot
+/** Web-video quality: the heights the stream offers (highest first) and the pinned one, null = automatic. One player per app. */
+object VideoQuality {
+    val heights = kotlinx.coroutines.flow.MutableStateFlow<List<Int>>(emptyList())
+    val pinned = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+}
+
 private const val APPLE_TV_UA = "AppleCoreMedia/1.0.0.21K69 (Apple TV; U; CPU OS 17_0 like Mac OS X; en_us)"
 
 class AirPlayVideoPlayer(private val context: Context) {
@@ -43,6 +49,7 @@ class AirPlayVideoPlayer(private val context: Context) {
     var onVideoSize: ((width: Int, height: Int, aspect: Float) -> Unit)? = null
     var onTitle: ((String?) -> Unit)? = null
     var onEnded: (() -> Unit)? = null
+    var onFailed: (() -> Unit)? = null
 
     private val _reportTick = object : Runnable {
         override fun run() {
@@ -52,12 +59,19 @@ class AirPlayVideoPlayer(private val context: Context) {
     }
 
     private val _listener = object : Player.Listener {
+        override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+            VideoQuality.heights.value = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
+                .flatMap { g -> (0 until g.length).map { g.getTrackFormat(it).height } }
+                .filter { it > 0 }.distinct().sortedDescending()
+            Log.i(TAG, "video qualities: ${VideoQuality.heights.value}")
+        }
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             Log.w(TAG, "playback error", error)
             (error.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.let { e ->
                 Log.w(TAG, "HTTP ${e.responseCode} for ${e.dataSpec.uri} headers=${e.headerFields.filterKeys { it != null }} " +
                     "sent=${e.dataSpec.httpRequestHeaders} cookies=${(java.net.CookieHandler.getDefault() as? java.net.CookieManager)?.cookieStore?.cookies?.map { it.name + "@" + it.domain }}")
             }
+            onFailed?.invoke()
             onEnded?.invoke()
         }
         override fun onPlaybackStateChanged(state: Int) {
@@ -90,10 +104,13 @@ class AirPlayVideoPlayer(private val context: Context) {
             .setAllowCrossProtocolRedirects(true)
         val p = ExoPlayer.Builder(context).setMediaSourceFactory(DefaultMediaSourceFactory(http)).build().also {
             it.addListener(_listener)
-            pendingSurface?.let { s -> it.setVideoSurface(s) }
+            // a surface left from an earlier screen may be gone already (back to mirroring): never hand it to the codec
+            pendingSurface?.takeIf { s -> s.isValid }?.let { s -> it.setVideoSurface(s) }
             it.volume = clientGain
         }
         player = p
+        VideoQuality.heights.value = emptyList()
+        VideoQuality.pinned.value = null
         p.setMediaItem(MediaItem.fromUri(location), (startPositionSeconds * 1000).toLong())
         p.playWhenReady = true
         p.prepare()
@@ -122,6 +139,20 @@ class AirPlayVideoPlayer(private val context: Context) {
     }
 
     // local-only: the sender self-syncs from its next /playback-info poll
+    /** Pin the video to [height] (one of [VideoQuality.heights]), or null for automatic. */
+    fun setQuality(height: Int?) = mainHandler.post {
+        VideoQuality.pinned.value = height
+        _applyQuality()
+    }
+
+    private fun _applyQuality() {
+        val p = player ?: return
+        val h = VideoQuality.pinned.value
+        p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().apply {
+            if (h == null) clearVideoSizeConstraints() else setMinVideoSize(0, h).setMaxVideoSize(Int.MAX_VALUE, h)
+        }.build()
+    }
+
     fun setPlaying(playing: Boolean) = mainHandler.post {
         player?.playWhenReady = playing
     }
@@ -152,6 +183,7 @@ class AirPlayVideoPlayer(private val context: Context) {
     }
 
     fun setSurface(surface: Surface) = mainHandler.post {
+        if (!surface.isValid) return@post
         pendingSurface = surface
         player?.setVideoSurface(surface)
     }

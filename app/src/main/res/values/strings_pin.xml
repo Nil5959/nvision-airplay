@@ -3,4 +3,6 @@
     <string name="pin_overlay_title">AirPlay code · %1$s</string>
     <string name="pin_overlay_hint">Enter this code on your iPhone</string>
     <string name="pin_overlay_ok">✓ Connected</string>
+    <string name="web_video_failed_title">This video cannot be shown over AirPlay</string>
+    <string name="web_video_failed_body">The site blocks the TV. Watch it on the phone; the next video will try the TV again.</string>
 </resources>
