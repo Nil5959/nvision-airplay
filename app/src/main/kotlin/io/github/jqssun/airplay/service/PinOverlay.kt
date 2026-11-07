@@ -43,7 +43,7 @@ class PinOverlay(private val ctx: Context) {
     fun canShow(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(ctx)
 
     /** Show [pin] for [room]. Main thread. Returns false when the overlay permission is missing. */
-    fun show(pin: String, room: String): Boolean {
+    fun show(pin: String, room: String, holdMs: Long = 15_000): Boolean {
         if (!canShow()) return false
         hideNow()
         val w = ctx.resources.displayMetrics.widthPixels.toFloat()
@@ -127,7 +127,7 @@ class PinOverlay(private val ctx: Context) {
                 .setInterpolator(OvershootInterpolator(1.6f)).setStartDelay(280L + 80L * i).setDuration(620).start()
         }
         main.removeCallbacks(timeout)
-        main.postDelayed(timeout, 120_000)
+        main.postDelayed(timeout, holdMs)  // gone after a while; a new attempt shows it again
         return true
     }
 

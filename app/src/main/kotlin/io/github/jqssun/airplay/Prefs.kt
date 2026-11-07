@@ -101,6 +101,7 @@ object Prefs {
     val MAX_FPS = int("max_fps", 60, 1..Int.MAX_VALUE, restart = true)
     val OVERSCANNED = bool("overscanned", false, restart = true)
     val REQUIRE_PIN = bool("require_pin", true, restart = true)  // N Vision: on-screen code by default
+    val PIN_EVERY_TIME = bool("pin_every_time", false, restart = true)  // like Apple TV "every time": a new code each session
     val PASSWORD = str("airplay_password", "", restart = true) { it.length <= 64 }
     val LANGUAGE = str("app_language", "he") { it.length <= 16 }   // N Vision: Hebrew unless set to "system" or a tag
     val ALLOW_NEW_CONN = bool("allow_new_conn", true, restart = true)

@@ -35,6 +35,8 @@ typedef struct {
 } server_ctx_t;
 
 static void _log_callback(void *cls, int level, const char *msg) {
+    if (cls && strstr(msg, "client proof not validated"))
+        android_callbacks_show_pin((android_callback_ctx_t *)cls);
     int prio = ANDROID_LOG_DEBUG;
     if (level <= LOGGER_ERR) prio = ANDROID_LOG_ERROR;
     else if (level == LOGGER_WARNING) prio = ANDROID_LOG_WARN;
@@ -47,7 +49,7 @@ JNIEXPORT jlong JNICALL
 Java_io_github_jqssun_airplay_bridge_NativeBridge_nativeInit(
         JNIEnv *env, jobject thiz,
         jobject callback, jbyteArray hwAddr, jstring name, jstring keyFile,
-        jboolean nohold, jboolean requirePin, jstring password) {
+        jboolean nohold, jboolean requirePin, jboolean pinEveryTime, jstring password) {
 
     server_ctx_t *ctx = new server_ctx_t();
 
@@ -62,6 +64,7 @@ Java_io_github_jqssun_airplay_bridge_NativeBridge_nativeInit(
     const int has_password = ctx->cb_ctx.password[0] != '\0';
     if (has_password) requirePin = JNI_FALSE;
     ctx->cb_ctx.require_pin = requirePin ? 1 : 0;
+    ctx->cb_ctx.pin_every_time = (requirePin && pinEveryTime) ? 1 : 0;
     android_callbacks_fill(&ctx->callbacks, &ctx->cb_ctx);
 
     ctx->raop = raop_init(&ctx->callbacks);
@@ -74,7 +77,7 @@ Java_io_github_jqssun_airplay_bridge_NativeBridge_nativeInit(
     ctx->cb_ctx.raop = ctx->raop;
 
     raop_set_log_level(ctx->raop, LOGGER_ERR);
-    raop_set_log_callback(ctx->raop, _log_callback, NULL);
+    raop_set_log_callback(ctx->raop, _log_callback, &ctx->cb_ctx);
 
     const char *keyfile_c = env->GetStringUTFChars(keyFile, NULL);
     const char *name_c = env->GetStringUTFChars(name, NULL);
@@ -97,7 +100,7 @@ Java_io_github_jqssun_airplay_bridge_NativeBridge_nativeInit(
             LOGE("Failed to generate random pin");
             pin = 1234;
         }
-        raop_set_plist(ctx->raop, "pin", pin + 10000);
+        android_callbacks_set_pin(&ctx->cb_ctx, pin);
     }
 
     /* shim dnssd_init only builds txt records; kotlin does the actual nsd registration */

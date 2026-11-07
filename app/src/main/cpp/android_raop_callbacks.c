@@ -5,11 +5,15 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <time.h>
 #include <errno.h>
 #include <android/log.h>
 #include "android_raop_callbacks.h"
 #include "audio_engine.h"
+#include "pairing.h"
+
+static void _forget_clients(android_callback_ctx_t *ctx);
 
 #define TAG "AirPlayNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -37,6 +41,9 @@ void android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject ca
     ctx->require_pin = 0;
     ctx->password[0] = '\0';
     ctx->registered_count = 0;
+    ctx->pin_every_time = 0;
+    ctx->open_conns = 0;
+    ctx->last_all_closed_ms = 0;
     ctx->audio_engine = NULL;
     memset(ctx->registered_keys, 0, sizeof(ctx->registered_keys));
 
@@ -78,11 +85,7 @@ void android_callbacks_destroy(android_callback_ctx_t *ctx, JNIEnv *env) {
         (*env)->DeleteGlobalRef(env, ctx->callback_obj);
         ctx->callback_obj = NULL;
     }
-    for (int i = 0; i < ctx->registered_count; i++) {
-        free(ctx->registered_keys[i]);
-        ctx->registered_keys[i] = NULL;
-    }
-    ctx->registered_count = 0;
+    _forget_clients(ctx);
     pthread_cond_destroy(&ctx->play_ready_cond);
     pthread_mutex_destroy(&ctx->playback_info_lock);
 }
@@ -127,10 +130,32 @@ static void _video_process(void *cls, raop_ntp_t *ntp, video_decode_struct *data
     (*env)->DeleteLocalRef(env, arr);
 }
 
+static long long _now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static void _forget_clients(android_callback_ctx_t *ctx) {
+    for (int i = 0; i < ctx->registered_count; i++) {
+        free(ctx->registered_keys[i]);
+        ctx->registered_keys[i] = NULL;
+    }
+    ctx->registered_count = 0;
+}
+
 static void _conn_init(void *cls) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
     /* fires for every connection including the player's own hls fetches: clear only a stale sentinel */
     pthread_mutex_lock(&ctx->playback_info_lock);
+    /* code every connection: a session that starts after everyone left (5 s grace for the
+       sender's own reconnects during the handshake) must pair again */
+    if (ctx->pin_every_time && ctx->open_conns == 0 &&
+        _now_ms() - ctx->last_all_closed_ms > 5000) {
+        _forget_clients(ctx);
+        LOGI("new session: senders forgotten");
+    }
+    ctx->open_conns++;
     if (ctx->playback_duration == -1.0) {
         ctx->playback_position = 0.0;
         ctx->playback_duration = 0.0;
@@ -145,6 +170,9 @@ static void _conn_init(void *cls) {
 
 static void _conn_destroy(void *cls) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    pthread_mutex_lock(&ctx->playback_info_lock);
+    if (ctx->open_conns > 0 && --ctx->open_conns == 0) ctx->last_all_closed_ms = _now_ms();
+    pthread_mutex_unlock(&ctx->playback_info_lock);
     JNIEnv *env = _get_env(ctx);
     if (!env) return;
     (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_conn_destroy);
@@ -192,6 +220,17 @@ static void _display_pin(void *cls, char *pin) {
     jstring jpin = (*env)->NewStringUTF(env, pin);
     (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_display_pin, jpin);
     (*env)->DeleteLocalRef(env, jpin);
+}
+
+void android_callbacks_set_pin(android_callback_ctx_t *ctx, int pin) {
+    snprintf(ctx->pin_str, sizeof(ctx->pin_str), "%04d", pin % 10000);
+    raop_set_plist(ctx->raop, "pin", pin % 10000 + 10000);
+}
+
+/* the sender first tries a code it remembers and, when that fails, may never ask us to show
+   the current one: show it anyway so the user can type it */
+void android_callbacks_show_pin(android_callback_ctx_t *ctx) {
+    if (ctx->pin_str[0]) _display_pin(ctx, ctx->pin_str);
 }
 
 /* fixed client-access password (RFC2617 digest), set from the app settings */
@@ -297,6 +336,12 @@ static void _register_client(void *cls, const char *device_id, const char *pk_st
     }
     ctx->registered_keys[ctx->registered_count++] = strdup(pk_str);
     LOGI("registered client pk (slot %d)", ctx->registered_count);
+    /* code every connection: a code works once; the next pairing gets a new one
+       (never change it mid-handshake, while the user is still typing it) */
+    if (ctx->pin_every_time && ctx->raop) {
+        int pin = random_pin();
+        if (pin >= 0) android_callbacks_set_pin(ctx, pin);
+    }
 }
 
 static bool _check_register(void *cls, const char *pk_str) {

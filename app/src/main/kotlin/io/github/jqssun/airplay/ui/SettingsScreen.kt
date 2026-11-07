@@ -93,6 +93,7 @@ private fun MainSettingsList(viewModel: MainViewModel, focusAdvanced: Boolean, o
     val serverName by viewModel.pref(Prefs.SERVER_NAME).collectAsState()
     val bootAutoStart by viewModel.pref(Prefs.BOOT_AUTO_START).collectAsState()
     val requirePin by viewModel.pref(Prefs.REQUIRE_PIN).collectAsState()
+    val pinEveryTime by viewModel.pref(Prefs.PIN_EVERY_TIME).collectAsState()
     val resolution by viewModel.pref(Prefs.RESOLUTION).collectAsState()
     val audioLatencyMs by viewModel.pref(Prefs.AUDIO_LATENCY_MS).collectAsState()
     var editor by remember { mutableStateOf<Editor?>(null) }
@@ -132,6 +133,12 @@ private fun MainSettingsList(viewModel: MainViewModel, focusAdvanced: Boolean, o
         }
         TvRow(stringResource(R.string.settings_pin_on_screen), if (requirePin) on else off) {
             viewModel.set(Prefs.REQUIRE_PIN, !requirePin)
+        }
+        if (requirePin) {
+            TvRow(stringResource(R.string.settings_pin_every_time),
+                stringResource(if (pinEveryTime) R.string.settings_pin_every_time_on else R.string.settings_pin_every_time_off)) {
+                viewModel.set(Prefs.PIN_EVERY_TIME, !pinEveryTime)
+            }
         }
         SectionHeader(stringResource(R.string.settings_group_picture_sound))
         val resolutionLabel = when (resolution) {

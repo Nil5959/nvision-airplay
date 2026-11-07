@@ -33,8 +33,8 @@ android {
         applicationId = "io.github.jqssun.airplay"
         minSdk = 23
         targetSdk = 37
-        versionCode = 36
-        versionName = "0.0.36-nv9"
+        versionCode = 37
+        versionName = "0.0.36-nv10"
 
         externalNativeBuild {
             cmake {
@@ -125,6 +125,7 @@ dependencies {
     implementation(libs.media3.transformer)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.oboe)
+    implementation(libs.okhttp)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

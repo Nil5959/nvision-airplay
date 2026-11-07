@@ -215,6 +215,9 @@
     <string name="settings_room_name">Room name</string>
     <string name="settings_start_with_tv">Start with the TV</string>
     <string name="settings_pin_on_screen">Code on screen</string>
+    <string name="settings_pin_every_time">Ask for the code</string>
+    <string name="settings_pin_every_time_on">Every time</string>
+    <string name="settings_pin_every_time_off">First time only</string>
     <string name="settings_audio_delay">Audio delay</string>
     <string name="settings_advanced">Advanced</string>
     <string name="settings_version">N Vision AirPlay · Version %1$s</string>

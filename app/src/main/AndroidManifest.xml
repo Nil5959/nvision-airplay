@@ -73,6 +73,19 @@
             android:foregroundServiceType="connectedDevice|mediaPlayback"
             android:exported="false" />
 
+        <service
+            android:name=".service.TvWakeAccessibility"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/tv_wake_accessibility" />
+        </service>
+
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"

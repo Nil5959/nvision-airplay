@@ -122,8 +122,10 @@ dnssd_register_raop(dnssd_t *dnssd, unsigned short port)
         _txt_set(rec, "sf", "0x84");
         break;
     case 1:
-        _txt_set(rec, "pw", "true");
-        _txt_set(rec, "sf", "0x8c");
+        /* on-screen code: PIN-required flag (0x8) without the password flag (0x80) and pw=false,
+           so the iPhone asks for the 4-digit "AirPlay code" (number pad) instead of a password */
+        _txt_set(rec, "pw", "false");
+        _txt_set(rec, "sf", "0xc");
         break;
     default:
         _txt_set(rec, "pw", "false");
@@ -172,16 +174,20 @@ dnssd_register_airplay(dnssd_t *dnssd, unsigned short port)
     _txt_set(rec, "features", features);
 
     switch (dnssd->pin_pw) {
-    case 1:
     case 2:
     case 3:
         _txt_set(rec, "pw", "true");
+        _txt_set(rec, "flags", "0x4");
+        break;
+    case 1:
+        _txt_set(rec, "pw", "false");
+        _txt_set(rec, "flags", "0xc");
         break;
     default:
         _txt_set(rec, "pw", "false");
+        _txt_set(rec, "flags", "0x4");
         break;
     }
-    _txt_set(rec, "flags", "0x4");
     _txt_set(rec, "model", GLOBAL_MODEL);
     if (dnssd->pk) {
         _txt_set(rec, "pk", dnssd->pk);

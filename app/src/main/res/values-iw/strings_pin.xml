@@ -5,4 +5,5 @@
     <string name="pin_overlay_ok">✓ מחובר</string>
     <string name="web_video_failed_title">אי אפשר לשדר את הסרטון הזה ב-AirPlay</string>
     <string name="web_video_failed_body">האתר חוסם את הטלוויזיה. אפשר לצפות בו בטלפון; הסרטון הבא ינסה שוב בטלוויזיה.</string>
+    <string name="tv_wake_accessibility_desc">מדליק את הטלוויזיה כשאייפון מתחיל AirPlay</string>
 </resources>

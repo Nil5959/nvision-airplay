@@ -36,6 +36,11 @@ typedef struct {
     jmethodID on_video_session_poll;
     int h265_enabled;
     int require_pin;
+    /* code every connection: forget paired senders and pick a new code when a new session starts */
+    int pin_every_time;
+    char pin_str[8];  /* the current on-screen code, to show it again after a failed attempt */
+    int open_conns;
+    long long last_all_closed_ms;
     char password[65];
     char *registered_keys[16];
     int registered_count;
@@ -55,6 +60,8 @@ typedef struct {
 void android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject callback_obj);
 void android_callbacks_destroy(android_callback_ctx_t *ctx, JNIEnv *env);
 void android_callbacks_fill(raop_callbacks_t *cbs, android_callback_ctx_t *ctx);
+void android_callbacks_set_pin(android_callback_ctx_t *ctx, int pin);
+void android_callbacks_show_pin(android_callback_ctx_t *ctx);
 void android_callbacks_update_playback_info(android_callback_ctx_t *ctx, double position,
                                              double duration, float rate, int ready);
 

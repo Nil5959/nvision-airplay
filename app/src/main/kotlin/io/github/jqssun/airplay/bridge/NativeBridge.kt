@@ -15,6 +15,7 @@ object NativeBridge {
         keyFile: String,
         nohold: Boolean,
         requirePin: Boolean,
+        pinEveryTime: Boolean,
         password: String
     ): Long
 

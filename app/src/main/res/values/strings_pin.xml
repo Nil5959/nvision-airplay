@@ -5,4 +5,5 @@
     <string name="pin_overlay_ok">✓ Connected</string>
     <string name="web_video_failed_title">This video cannot be shown over AirPlay</string>
     <string name="web_video_failed_body">The site blocks the TV. Watch it on the phone; the next video will try the TV again.</string>
+    <string name="tv_wake_accessibility_desc">Turns the TV on when an iPhone starts AirPlay</string>
 </resources>

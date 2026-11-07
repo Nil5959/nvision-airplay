@@ -24,6 +24,7 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
+import android.view.KeyEvent
 import android.view.Surface
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -227,6 +228,17 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        // the remote's Back closes the code card (the card itself can't take focus)
+        var backEaten = false
+        TvWakeAccessibility.onKey = { e ->
+            if (e.keyCode == KeyEvent.KEYCODE_BACK && (pinOverlay.showing || backEaten)) {
+                if (e.action == KeyEvent.ACTION_DOWN) { backEaten = true; pinOverlay.hide() } else backEaten = false
+                true
+            } else {
+                if (e.action == KeyEvent.ACTION_DOWN) _userTookOver()
+                false
+            }
+        }
         dacpController = DacpController(this)
         dacpPlayer = DacpPlayer(
             mainLooper,
@@ -403,7 +415,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 0,
             audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 0
         )
-        nativeHandle = NativeBridge.nativeInit(this, hwAddr, effectiveName, keyFile, nohold, requirePin, "")  // fixed password dropped: on-screen code instead
+        nativeHandle = NativeBridge.nativeInit(this, hwAddr, effectiveName, keyFile, nohold, requirePin, prefs[Prefs.PIN_EVERY_TIME], "")  // fixed password dropped: on-screen code instead
         if (nativeHandle == 0L) {
             log("Native init failed")
             _failStart()
@@ -643,6 +655,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onDestroy() {
+        TvWakeAccessibility.onKey = null
         stopServer()
         dacpPlayer.release()
         mediaReceiver?.let {
@@ -672,6 +685,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onVideoPlay(location: String, startPositionSeconds: Float) {
         _videoStartedAt = SystemClock.elapsedRealtime()
+        _wakeTv()
         _onMediaStarted()
         _videoLocation.value = location
         _videoPlaySeq.value++
@@ -818,6 +832,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         val firstConnection = _connectionCount.value == 0
         _connectionCount.value++
         log("Sender connected (${_connectionCount.value})")
+        if (firstConnection) { _mainHandler.removeCallbacks(_tvOff); _wakeTv() }
         if (firstConnection && shouldLaunchOnConnect()) _launchPending = true
     }
 
@@ -825,6 +840,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         _connectionCount.value = (_connectionCount.value - 1).coerceAtLeast(0)
         if (_connectionCount.value == 0) {
             _launchPending = false
+            if (_tvOnByAirPlay) { _mainHandler.removeCallbacks(_tvOff); _mainHandler.postDelayed(_tvOff, 30_000) }
             // clients may drop without POST /stop; must run before the poll-state reset
             _endVideoPlayback("AirPlay Video stopped (disconnect)")
             // last client gone: release audio output devices to save power
@@ -858,12 +874,16 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onDisplayPin(pin: String) {
-        if (_lastPin == pin) return
+        _wakeTv()
+        if (_lastPin == pin && pinOverlay.showing) return
         _lastPin = pin
+        log("Showing code")
         pinCallback?.invoke(pin)
         val room = prefs[Prefs.SERVER_NAME].ifBlank { Prefs.SERVER_NAME.def }
         // the code over whatever is on screen; without the overlay permission fall back to opening the app
-        _mainHandler.post { if (!pinOverlay.show(pin, room)) launchMainActivity() }
+        // the TV may still be turning on: keep the code up longer right after a wake
+        val holdMs = if (SystemClock.elapsedRealtime() - _wokeAt < 10_000) 25_000L else 15_000L
+        _mainHandler.post { if (!pinOverlay.show(pin, room, holdMs)) launchMainActivity() }
         _updateMediaNotification()
     }
 
@@ -916,6 +936,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         if (running && _videoPlaybackActive.value && SystemClock.elapsedRealtime() - _videoStartedAt > 3000) {
             _mainHandler.post { _endVideoPlayback("AirPlay Video stopped (back to mirroring)") }
         }
+        if (running) _wakeTv()
         if (running) videoRenderer.startSession() else {
             videoRenderer.stopSession()
             _mirroringActive.value = false
@@ -1040,8 +1061,51 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         _onMediaStarted()
     }
 
+    /** A sender starts showing something while the box sleeps: turn the screen on, the TV follows over HDMI-CEC. */
+    @Suppress("DEPRECATION")
+    private fun _wakeTv() {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        // asleep, or awake only because we turned the TV off ourselves and the box didn't sleep
+        if (pm.isInteractive && !_tvOffByAirPlay) return
+        _tvOffByAirPlay = false
+        log("Waking the TV")
+        _wokeAt = SystemClock.elapsedRealtime()
+        pm.newWakeLock(PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+            "airplay:wake").acquire(3_000)
+        // waking alone doesn't turn a Samsung on; Fire OS sends the CEC "turn on" on a Home press
+        _mainHandler.postDelayed({
+            if (TvWakeAccessibility.turnOnTv()) _tvOnByAirPlay = true else log("TV turn-on: accessibility off")
+        }, 800)
+    }
+    @Volatile private var _wokeAt = 0L
+
+    // AirPlay turned the TV on: turn it back off 30 s after the sender leaves (or never got in),
+    // unless someone picked up the remote meanwhile
+    @Volatile private var _tvOnByAirPlay = false
+    @Volatile private var _tvOffByAirPlay = false
+    private val samsungTv by lazy { SamsungTv(prefs) }
+    private val _tvExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val _tvOff = Runnable {
+        if (!_tvOnByAirPlay || _connectionCount.value > 0) return@Runnable
+        _tvOnByAirPlay = false
+        _tvExecutor.execute {
+            if (samsungTv.powerOff()) {
+                log("TV turned back off")
+                _tvOffByAirPlay = true
+                _mainHandler.post { TvWakeAccessibility.sleep() }
+            } else log("TV turn-off: no paired Samsung reachable")
+        }
+    }
+    private fun _userTookOver() {
+        _tvOnByAirPlay = false
+        _tvOffByAirPlay = false
+        _mainHandler.removeCallbacks(_tvOff)
+    }
+
     /** The sender got through (media is flowing): "connected" on the code card, then open the app if due. */
     private fun _onMediaStarted() {
+        // first time only: the TV asks to allow us, over the picture, while someone is watching
+        if (_tvOnByAirPlay && !samsungTv.paired) _tvExecutor.execute { Thread.sleep(3_000); samsungTv.pairIfNeeded() }
         _mainHandler.post {
             if (pinOverlay.showing) pinOverlay.success()
             if (_launchPending) {
