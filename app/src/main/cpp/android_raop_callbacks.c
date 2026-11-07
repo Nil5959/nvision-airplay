@@ -148,10 +148,10 @@ static void _conn_init(void *cls) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
     /* fires for every connection including the player's own hls fetches: clear only a stale sentinel */
     pthread_mutex_lock(&ctx->playback_info_lock);
-    /* code every connection: a session that starts after everyone left (5 s grace for the
-       sender's own reconnects during the handshake) must pair again */
+    /* code every connection: a session that starts a minute after everyone left must pair again
+       (the iPhone drops and reconnects by itself around a web video and during the handshake) */
     if (ctx->pin_every_time && ctx->open_conns == 0 &&
-        _now_ms() - ctx->last_all_closed_ms > 5000) {
+        _now_ms() - ctx->last_all_closed_ms > 60000) {
         _forget_clients(ctx);
         LOGI("new session: senders forgotten");
     }

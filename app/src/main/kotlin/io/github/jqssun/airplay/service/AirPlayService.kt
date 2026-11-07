@@ -646,12 +646,15 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     private fun _endVideoPlayback(message: String) {
         if (!_videoPlaybackActive.value) return
+        _senderStopAt = 0
         // lingering polls after a stop must not bounce the UI back to a pending session
         _videoPollSuppressed = true
         _videoPlaybackActive.value = false
         airPlayVideoPlayer.stop()
         if (!_audioOnly.value) mediaSession?.isActive = false
         log(message)
+        // a video that kept playing after the phone left just ended: the TV goes back off if AirPlay turned it on
+        if (_tvOnByAirPlay && _connectionCount.value == 0) { _mainHandler.removeCallbacks(_tvOff); _mainHandler.postDelayed(_tvOff, 30_000) }
     }
 
     override fun onDestroy() {
@@ -685,6 +688,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onVideoPlay(location: String, startPositionSeconds: Float) {
         _videoStartedAt = SystemClock.elapsedRealtime()
+        _senderStopAt = 0
         _wakeTv()
         _onMediaStarted()
         _videoLocation.value = location
@@ -709,7 +713,20 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         airPlayVideoPlayer.setRate(rate)
     }
 
-    override fun onVideoStop() = _endVideoPlayback("AirPlay Video stopped")
+    // Closing the video in Safari just resumes mirroring (handled in onMirrorRunning); a /stop while
+    // the sender stays connected comes when the phone locks. Keep the video on the TV then: it plays
+    // straight from the site, and the remote's Back ends it. Videos the phone itself proxies
+    // (YouTube's localhost playlists) can't go on without it.
+    @Volatile private var _senderStopAt = 0L
+    override fun onVideoStop() {
+        val viaPhone = _videoLocation.value?.contains("localhost") != false
+        if (_videoPlaybackActive.value && !viaPhone) {
+            _senderStopAt = SystemClock.elapsedRealtime()
+            log("Sender sent stop (phone locked?): the video keeps playing on the TV")
+            return
+        }
+        _endVideoPlayback("AirPlay Video stopped")
+    }
 
     override fun onAudioFormat(ct: Int, spf: Int, usingScreen: Boolean) {
         clearPin()
@@ -725,6 +742,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onVideoSize(srcW: Float, srcH: Float, w: Float, h: Float) {
         clearPin()
+        // a locked phone sends no screen; the first picture after the lock-stop means it's back in use
+        if (_videoPlaybackActive.value && _senderStopAt > 0 && SystemClock.elapsedRealtime() - _senderStopAt > 1_500) {
+            _mainHandler.post { _endVideoPlayback("AirPlay Video stopped (phone back on: mirroring)") }
+        }
         if (w > 0 && h > 0) {
             _videoAspect.value = w / h
             _videoResolution.value = "${w.toInt()}x${h.toInt()}"
@@ -841,8 +862,11 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         if (_connectionCount.value == 0) {
             _launchPending = false
             if (_tvOnByAirPlay) { _mainHandler.removeCallbacks(_tvOff); _mainHandler.postDelayed(_tvOff, 30_000) }
-            // clients may drop without POST /stop; must run before the poll-state reset
-            _endVideoPlayback("AirPlay Video stopped (disconnect)")
+            // clients may drop without POST /stop; must run before the poll-state reset.
+            // A phone that locked a while ago and now leaves keeps its video on the TV; "Stop
+            // Mirroring" (stop then leave at once) ends it.
+            val lockedEarlier = _senderStopAt > 0 && SystemClock.elapsedRealtime() - _senderStopAt > 5_000
+            if (!lockedEarlier) _endVideoPlayback("AirPlay Video stopped (disconnect)")
             // last client gone: release audio output devices to save power
             audioRenderer.stop()
             _audioOnly.value = false
@@ -933,7 +957,9 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         log("mirror running=$running video=${_videoPlaybackActive.value} sinceVideoMs=${SystemClock.elapsedRealtime() - _videoStartedAt}")
         // the sender closed the web video and went back to screen mirroring without a /stop:
         // end the video so the mirror shows again (ignore the first seconds, when the hand-off is still settling)
-        if (running && _videoPlaybackActive.value && SystemClock.elapsedRealtime() - _videoStartedAt > 3000) {
+        // (but not right after a /stop: that's the phone locking, and mirroring resumes with it)
+        if (running && _videoPlaybackActive.value && SystemClock.elapsedRealtime() - _videoStartedAt > 3000 &&
+            SystemClock.elapsedRealtime() - _senderStopAt > 3000) {
             _mainHandler.post { _endVideoPlayback("AirPlay Video stopped (back to mirroring)") }
         }
         if (running) _wakeTv()
@@ -1086,7 +1112,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     private val samsungTv by lazy { SamsungTv(prefs) }
     private val _tvExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     private val _tvOff = Runnable {
-        if (!_tvOnByAirPlay || _connectionCount.value > 0) return@Runnable
+        if (!_tvOnByAirPlay || _connectionCount.value > 0 || _videoPlaybackActive.value) return@Runnable
         _tvOnByAirPlay = false
         _tvExecutor.execute {
             if (samsungTv.powerOff()) {
