@@ -14,6 +14,7 @@
 #include "pairing.h"
 
 static void _forget_clients(android_callback_ctx_t *ctx);
+static long long _now_ms(void);
 
 #define TAG "AirPlayNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -115,6 +116,16 @@ static void _audio_process(void *cls, raop_ntp_t *ntp, audio_decode_struct *data
 
 static void _video_process(void *cls, raop_ntp_t *ntp, video_decode_struct *data) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    {   /* diagnostics: how late mirror frames arrive vs their presentation time, every 2 s */
+        static long long diag_at = 0;
+        long long now = _now_ms();
+        if (now - diag_at > 2000 && data->ntp_time_local) {
+            struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+            long long rt = (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+            LOGI("video tick: arrives %lld ms after pts", (rt - (long long)data->ntp_time_local) / 1000000);
+            diag_at = now;
+        }
+    }
     JNIEnv *env = _get_env(ctx);
     if (!env || !data->data || data->data_len <= 0) return;
     /* raop_rtp_mirror marks undecryptable packets by setting byte 0 (start code) to 1 */

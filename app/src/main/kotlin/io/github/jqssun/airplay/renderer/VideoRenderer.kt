@@ -87,7 +87,7 @@ class VideoRenderer(ctx: Context) {
     // codec per mirror session; pipeline persists across sessions
     fun startSession() = synchronized(lock) { _resetStats() }
 
-    fun stopSession() = synchronized(lock) { stopCodec() }
+    fun stopSession() = synchronized(lock) { _delayQ.clear(); stopCodec() }
 
     private fun _resetStats() {
         fps = 0; bitrateBps = 0; frameCount = 0; codecName = ""
@@ -120,7 +120,33 @@ class VideoRenderer(ctx: Context) {
         benchmarkLogCallback?.invoke(msg)
     }
 
+    /** Hold mirror frames this long before decoding, to line the picture up with the sound (live). */
+    @Volatile var delayMs = 0
+    private class Delayed(val data: ByteArray, val ntpTimeNs: Long, val isH265: Boolean, val dueNs: Long)
+    private val _delayQ = java.util.concurrent.LinkedBlockingQueue<Delayed>()
+    private val _delayThread by lazy {
+        Thread({
+            while (true) {
+                val f = try { _delayQ.take() } catch (_: InterruptedException) { return@Thread }
+                val waitNs = f.dueNs - System.nanoTime()
+                if (waitNs > 0) try { Thread.sleep(waitNs / 1_000_000, (waitNs % 1_000_000).toInt()) } catch (_: InterruptedException) { return@Thread }
+                _feedNow(f.data, f.ntpTimeNs, f.isH265)
+            }
+        }, "video-delay").apply { isDaemon = true; start() }
+    }
+
     fun feedFrame(data: ByteArray, ntpTimeNs: Long, isH265: Boolean) {
+        // compressed frames wait before the decoder (decoded ones can't: the codec has few output buffers)
+        val d = delayMs
+        if (d > 0 || _delayQ.isNotEmpty()) {
+            _delayThread
+            _delayQ.put(Delayed(data, ntpTimeNs, isH265, System.nanoTime() + d * 1_000_000L))
+            return
+        }
+        _feedNow(data, ntpTimeNs, isH265)
+    }
+
+    private fun _feedNow(data: ByteArray, ntpTimeNs: Long, isH265: Boolean) {
         synchronized(lock) {
             _updateStats(data.size)
             if (videoWidth == 0 || videoHeight == 0) return

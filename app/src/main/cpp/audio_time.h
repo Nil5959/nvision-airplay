@@ -12,4 +12,11 @@ static inline int64_t monoNs() {
     return (int64_t)ts.tv_sec * NS_PER_SEC + ts.tv_nsec;
 }
 
+// the clock AirPlay's local presentation times (ntp_time_local) are on
+static inline int64_t rtNs() {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (int64_t)ts.tv_sec * NS_PER_SEC + ts.tv_nsec;
+}
+
 #endif  // AUDIO_TIME_H

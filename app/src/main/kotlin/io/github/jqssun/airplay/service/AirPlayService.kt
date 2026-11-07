@@ -361,6 +361,9 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
                 .collect { audioRenderer.updateConfig(it) }
         }
         lifecycleScope.launch {
+            prefs.observe { this[Prefs.VIDEO_DELAY_MS] }.collect { videoRenderer.delayMs = it }
+        }
+        lifecycleScope.launch {
             prefs.observe { this[Prefs.SYNC_CLIENT_VOLUME] }.collect {
                 _syncClientVol = it
                 _clientVolDriveEnd()
@@ -680,6 +683,20 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onVideoData(data: ByteArray, ntpTimeNs: Long, isH265: Boolean) {
         videoRenderer.feedFrame(data, ntpTimeNs, isH265)
+        // a locked phone sends no screen frames; a burst of them after the lock-stop means it's back in use
+        if (_senderStopAt > 0 && _videoPlaybackActive.value) {
+            val now = SystemClock.elapsedRealtime()
+            if (now - _senderStopAt > 3_000) {
+                if (now - _keptFramesAt > 1_000) { _keptFramesAt = now; _keptFrames = 0 }
+                if (++_keptFrames >= 5) _phoneBackOn("frames")
+            }
+        }
+    }
+    private var _keptFrames = 0
+    private var _keptFramesAt = 0L
+    private fun _phoneBackOn(why: String) {
+        _senderStopAt = 0
+        _mainHandler.post { _endVideoPlayback("AirPlay Video stopped (phone back on, $why: mirroring)") }
     }
 
     override fun onVideoSessionPoll() {
@@ -742,9 +759,9 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onVideoSize(srcW: Float, srcH: Float, w: Float, h: Float) {
         clearPin()
-        // a locked phone sends no screen; the first picture after the lock-stop means it's back in use
-        if (_videoPlaybackActive.value && _senderStopAt > 0 && SystemClock.elapsedRealtime() - _senderStopAt > 1_500) {
-            _mainHandler.post { _endVideoPlayback("AirPlay Video stopped (phone back on: mirroring)") }
+        // the mirror stream restarting well after the lock-stop: the phone is back in use
+        if (_videoPlaybackActive.value && _senderStopAt > 0 && SystemClock.elapsedRealtime() - _senderStopAt > 3_000) {
+            _phoneBackOn("size")
         }
         if (w > 0 && h > 0) {
             _videoAspect.value = w / h

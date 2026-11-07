@@ -106,6 +106,7 @@ object Prefs {
     val LANGUAGE = str("app_language", "he") { it.length <= 16 }   // N Vision: Hebrew unless set to "system" or a tag
     val ALLOW_NEW_CONN = bool("allow_new_conn", true, restart = true)
     val AUDIO_LATENCY_MS = int("audio_latency_ms", -1, -1..1000, restart = true)
+    val VIDEO_DELAY_MS = int("video_delay_ms", 0, 0..2000)  // mirror picture held back to match the sound
     val DEBUG_ENABLED = bool("debug_enabled", false)
     val DEVELOPER_OPTIONS = bool("developer_options", false)
     val BENCHMARK_LOG = bool("benchmark_log", false, restart = true)

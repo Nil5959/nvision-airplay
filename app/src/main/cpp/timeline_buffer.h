@@ -10,6 +10,8 @@
 #include <string>
 
 #include "audio_time.h"
+#include <android/log.h>
+#define TL_LOG(...) __android_log_print(ANDROID_LOG_INFO, "AirPlayNative", __VA_ARGS__)
 
 /*
  * lock-free SPSC ring of int16 samples (interleaved frames); positions are
@@ -216,6 +218,7 @@ public:
           mRing(2 * capOf(mTracker.ceil()) + (size_t)sampleRate * TRIM_THROTTLE_MS / 1000 * channels) {}
 
     void noteOutputBufferFrames(int frames) { mTracker.noteOutputBufferFrames(frames); }
+    int64_t mDiagAtNs = 0;  // producer-side diagnostics throttle
 
     // producer: push samples
     void write(const int16_t *pcm, size_t samples, int64_t ptsNs) {
@@ -229,10 +232,27 @@ public:
 
         // consumer underran since last write: it already played the gap as real-time
         // silence, re-anchor so we don't also insert it here
-        if (mUnderran.exchange(false, std::memory_order_relaxed)) {
+        const bool underran = mUnderran.exchange(false, std::memory_order_relaxed);
+        if (underran) {
             mExpectedPtsNs = ptsNs;
         }
         const int64_t gapNs = ptsNs - mExpectedPtsNs;
+
+        // diagnostics: how late the sender's audio arrives vs its presentation time
+        {
+            const int64_t lateMs = (rtNs() - ptsNs) / 1000000;
+            const int64_t nowMono = monoNs();
+            const bool start = underran || gapNs > MAX_GAP_NS || gapNs < -MAX_GAP_NS;
+            if (start || nowMono - mDiagAtNs > 2 * NS_PER_SEC) {
+                const TimelineMetrics::Debug m = mMetrics.debugInfo();
+                TL_LOG("audio %s: arrives %lld ms after pts, gap %lld ms, backlog %d ms, cushion %d ms, drops %u silences %u underruns %u trims %u",
+                       start ? "START" : "tick", (long long)lateMs, (long long)(gapNs / 1000000),
+                       (int)(mRing.available() / mChannels * 1000 / mSampleRate),
+                       (int)(mTracker.target() / mChannels * 1000 / mSampleRate),
+                       m.drops, m.silences, m.underruns, m.trims);
+                mDiagAtNs = nowMono;
+            }
+        }
 
         // large gap: possible discontinuity or clock shift. reanchor() must precede
         // observe() so the reset applies to this observation
