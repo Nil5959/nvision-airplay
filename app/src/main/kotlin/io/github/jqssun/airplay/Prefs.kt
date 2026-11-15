@@ -109,6 +109,7 @@ object Prefs {
     val VIDEO_DELAY_MS = int("video_delay_ms", 0, 0..2000)  // mirror picture held back to match the sound
     // TVs that never send a CEC wake (Samsung Q7 2017): wake the box when the TV shows up on the network
     val TV_IP = str("tv_ip", "") { it.isEmpty() || Regex("\\d{1,3}(\\.\\d{1,3}){3}").matches(it) }
+    val TV_MAC = str("tv_mac", "") { it.length <= 64 }  // TV identity (MAC or uuid), learned from tv_ip, finds the TV again when its IP changes
     val TV_WAKE_APP = str("tv_wake_app", "") { it.isEmpty() || Regex("[A-Za-z0-9_.]{1,128}").matches(it) }  // reopened fresh after such a wake
     val DEBUG_ENABLED = bool("debug_enabled", false)
     val DEVELOPER_OPTIONS = bool("developer_options", false)

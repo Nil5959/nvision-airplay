@@ -96,6 +96,12 @@ class SamsungTv(private val prefs: SharedPreferences) {
         return got
     }
 
+    /** (ip, Wi-Fi MAC) of every Samsung TV answering on this network right now. Blocking. */
+    fun findAll(): List<Pair<String, String>> = discover().map { it.ip to it.mac }
+
+    /** A stable identity (Wi-Fi MAC or device uuid) for the Samsung TV at [ip], or null. Blocking. */
+    fun macOf(ip: String): String? = info(ip)?.mac
+
     /** Samsung TVs answering on this /24 (one in standby usually doesn't). */
     private fun discover(): List<Tv> {
         val prefix = NetworkInterface.getNetworkInterfaces().toList().flatMap { it.inetAddresses.toList() }
@@ -111,7 +117,9 @@ class SamsungTv(private val prefs: SharedPreferences) {
         Socket().use { it.connect(InetSocketAddress(ip, 8001), 400) }
         client.newCall(Request.Builder().url("http://$ip:8001/api/v2/").build()).execute().use { r ->
             val d = JSONObject(r.body!!.string()).optJSONObject("device")
-            if (d != null && d.optString("type").contains("Samsung")) Tv(ip, d.optString("wifiMac")) else null
+            // identity: the Wi-Fi MAC, or the device uuid on a wired TV (wifiMac "none")
+            val id = d?.optString("wifiMac")?.takeIf { it.length == 17 } ?: d?.optString("id").orEmpty()
+            if (d != null && d.optString("type").contains("Samsung")) Tv(ip, id) else null
         }
     } catch (_: Exception) { null }
 

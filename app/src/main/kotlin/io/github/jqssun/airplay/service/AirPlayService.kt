@@ -381,12 +381,24 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_START_SERVER) {
+        // null intent: the system restarted us after killing the process (START_STICKY)
+        if (intent == null || intent.action == ACTION_START_SERVER) {
             promoteToForeground()
             _startServer(ensureServiceStarted = false)
-            if (_serverState.value != ServerState.RUNNING) stopSelf(startId)
+            // after a power cut the router may come up after the box: keep trying, don't give up
+            if (_serverState.value != ServerState.RUNNING) { promoteToForeground(); _mainHandler.postDelayed(_retryStart, 10_000) }
+            return START_STICKY
         }
         return START_NOT_STICKY
+    }
+    private val _retryStart: Runnable = object : Runnable {
+        override fun run() {
+            if (_serverState.value == ServerState.RUNNING) return
+            log("Server not running yet (network?): retrying")
+            promoteToForeground()
+            _startServer(ensureServiceStarted = false)
+            if (_serverState.value != ServerState.RUNNING) { promoteToForeground(); _mainHandler.postDelayed(this, 10_000) }
+        }
     }
 
     fun startServer() {
@@ -1131,35 +1143,77 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
      * sleep may show a gray screen (Partner TV+), so it's stopped on sleep and opened fresh on wake.
      */
     private fun _startTvWatch() {
+        // every wake (TV-on, the box's remote, CEC): open the app fresh, unless AirPlay itself woke the box
+        val screenOn = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) {
+                val app = prefs[Prefs.TV_WAKE_APP]
+                if (app.isEmpty()) return
+                if (SystemClock.elapsedRealtime() - _wokeAt < 10_000 || _connectionCount.value > 0) return
+                _mainHandler.removeCallbacks(_openWakeApp)
+                _mainHandler.postDelayed(_openWakeApp, 1_000)
+            }
+        }
+        registerReceiver(screenOn, android.content.IntentFilter(Intent.ACTION_SCREEN_ON))
+        // on sleep: step to the home screen so the app is in the background, then end its process,
+        // so the next wake starts it from scratch (reopened in the same process, live video stays black)
+        val screenOff = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) {
+                val app = prefs[Prefs.TV_WAKE_APP]
+                if (app.isEmpty() || _connectionCount.value > 0) return
+                _mainHandler.removeCallbacks(_openWakeApp)
+                try {
+                    startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                } catch (_: Exception) {}
+                _mainHandler.postDelayed({
+                    (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).killBackgroundProcesses(app)
+                    log("TV watch: box asleep, ended $app")
+                }, 2_000)
+            }
+        }
+        registerReceiver(screenOff, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF))
         Thread({
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             var downCount = 0
-            var wasInteractive = pm.isInteractive
+            var awakeMisses = 0
             while (true) {
                 try { Thread.sleep(2_000) } catch (_: InterruptedException) { return@Thread }
-                val ip = prefs[Prefs.TV_IP]
-                if (ip.isEmpty()) continue
-                val interactive = pm.isInteractive
-                val app = prefs[Prefs.TV_WAKE_APP]
-                if (wasInteractive && !interactive && app.isNotEmpty()) {
-                    // once the box sleeps the app is no longer on top: let it go, so it starts clean next time
-                    _mainHandler.postDelayed({
-                        if (!pm.isInteractive) {
-                            (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).killBackgroundProcesses(app)
-                            log("TV watch: box asleep, stopped $app")
-                        }
-                    }, 5_000)
-                }
-                wasInteractive = interactive
-                val up = _ping(ip)
-                // down for two checks in a row (a lost ping is not a standby), then up: the TV was turned on
-                if (up && downCount >= 2 && !interactive) {
-                    log("TV watch: $ip is back, waking the box")
-                    _mainHandler.post { _wakeForTv(app) }
-                }
-                downCount = if (up) 0 else downCount + 1
+                try {
+                    val ip = prefs[Prefs.TV_IP]
+                    if (ip.isEmpty()) continue
+                    val interactive = pm.isInteractive
+                    val up = _ping(ip)
+                    if (up && prefs[Prefs.TV_MAC].let { it.isEmpty() || it == "none" }) samsungTv.macOf(ip)?.takeIf { it.isNotEmpty() }?.let {
+                        Prefs.TV_MAC.write(prefs, it); log("TV watch: $ip is $it")
+                    }
+                    // down for two checks in a row (a lost ping is not a standby), then up: the TV was turned on
+                    if (up && downCount >= 2 && !interactive) {
+                        log("TV watch: $ip is back, waking the box")
+                        _mainHandler.post { _wakeForTv() }
+                    }
+                    downCount = if (up) 0 else downCount + 1
+                    // the box is awake, so its TV is on: silent for a minute means it got a new IP; find it by MAC
+                    awakeMisses = if (interactive && !up) awakeMisses + 1 else 0
+                    if (awakeMisses >= 30) {
+                        awakeMisses = 0
+                        val mac = prefs[Prefs.TV_MAC]
+                        val all = samsungTv.findAll()
+                        val found = all.firstOrNull { mac.isNotEmpty() && it.second == mac }?.first
+                            ?: all.singleOrNull()?.first.takeIf { mac.isEmpty() }
+                        if (found != null && found != ip) { Prefs.TV_IP.write(prefs, found); log("TV watch: TV moved $ip -> $found") }
+                        else log("TV watch: $ip silent, ${all.size} Samsung(s) found, none matches")
+                    }
+                } catch (e: Exception) { log("TV watch error: $e") }   // never let the watcher die
             }
         }, "tv-watch").apply { isDaemon = true; start() }
+    }
+
+    // fresh task: the app resumed from sleep can come back gray (Partner TV+)
+    private val _openWakeApp = Runnable {
+        val app = prefs[Prefs.TV_WAKE_APP]
+        val i = packageManager.getLeanbackLaunchIntentForPackage(app) ?: packageManager.getLaunchIntentForPackage(app)
+        if (i == null) { log("TV watch: $app not installed"); return@Runnable }
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        try { startActivity(i); log("TV watch: opened $app fresh") } catch (e: Exception) { log("TV watch: open $app failed: $e") }
     }
 
     private fun _ping(ip: String): Boolean = try {
@@ -1171,18 +1225,11 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     @Suppress("DEPRECATION")
-    private fun _wakeForTv(app: String) {
-        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        pm.newWakeLock(PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+    private fun _wakeForTv() {
+        // the screen-on receiver then opens the wake app
+        (getSystemService(Context.POWER_SERVICE) as PowerManager).newWakeLock(
+            PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
             "airplay:tvwatch").acquire(3_000)
-        if (app.isEmpty()) return
-        // after the launcher's own wake handling: open the app as a fresh task
-        _mainHandler.postDelayed({
-            val i = packageManager.getLeanbackLaunchIntentForPackage(app) ?: packageManager.getLaunchIntentForPackage(app)
-            if (i == null) { log("TV watch: $app not installed"); return@postDelayed }
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            try { startActivity(i); log("TV watch: opened $app fresh") } catch (e: Exception) { log("TV watch: open $app failed: $e") }
-        }, 2_500)
     }
 
     // AirPlay turned the TV on: turn it back off 30 s after the sender leaves (or never got in),
