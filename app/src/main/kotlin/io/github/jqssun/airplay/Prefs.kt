@@ -107,6 +107,9 @@ object Prefs {
     val ALLOW_NEW_CONN = bool("allow_new_conn", true, restart = true)
     val AUDIO_LATENCY_MS = int("audio_latency_ms", -1, -1..1000, restart = true)
     val VIDEO_DELAY_MS = int("video_delay_ms", 0, 0..2000)  // mirror picture held back to match the sound
+    // TVs that never send a CEC wake (Samsung Q7 2017): wake the box when the TV shows up on the network
+    val TV_IP = str("tv_ip", "") { it.isEmpty() || Regex("\\d{1,3}(\\.\\d{1,3}){3}").matches(it) }
+    val TV_WAKE_APP = str("tv_wake_app", "") { it.isEmpty() || Regex("[A-Za-z0-9_.]{1,128}").matches(it) }  // reopened fresh after such a wake
     val DEBUG_ENABLED = bool("debug_enabled", false)
     val DEVELOPER_OPTIONS = bool("developer_options", false)
     val BENCHMARK_LOG = bool("benchmark_log", false, restart = true)

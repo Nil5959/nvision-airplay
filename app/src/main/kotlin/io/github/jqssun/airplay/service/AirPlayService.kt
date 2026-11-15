@@ -1,5 +1,6 @@
 package io.github.jqssun.airplay.service
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -228,6 +229,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        _startTvWatch()
         // the remote's Back closes the code card (the card itself can't take focus)
         var backEaten = false
         TvWakeAccessibility.onKey = { e ->
@@ -1121,6 +1123,67 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         }, 800)
     }
     @Volatile private var _wokeAt = 0L
+
+    /**
+     * Some TVs (Samsung Q7 2017) never send a CEC wake when turned on with their own remote, so the box
+     * stays asleep on "no signal". They do leave the network ~25 s after standby and answer ping ~3 s
+     * after power-on: when the TV comes back while the box sleeps, wake the box. The app resumed from
+     * sleep may show a gray screen (Partner TV+), so it's stopped on sleep and opened fresh on wake.
+     */
+    private fun _startTvWatch() {
+        Thread({
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            var downCount = 0
+            var wasInteractive = pm.isInteractive
+            while (true) {
+                try { Thread.sleep(2_000) } catch (_: InterruptedException) { return@Thread }
+                val ip = prefs[Prefs.TV_IP]
+                if (ip.isEmpty()) continue
+                val interactive = pm.isInteractive
+                val app = prefs[Prefs.TV_WAKE_APP]
+                if (wasInteractive && !interactive && app.isNotEmpty()) {
+                    // once the box sleeps the app is no longer on top: let it go, so it starts clean next time
+                    _mainHandler.postDelayed({
+                        if (!pm.isInteractive) {
+                            (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).killBackgroundProcesses(app)
+                            log("TV watch: box asleep, stopped $app")
+                        }
+                    }, 5_000)
+                }
+                wasInteractive = interactive
+                val up = _ping(ip)
+                // down for two checks in a row (a lost ping is not a standby), then up: the TV was turned on
+                if (up && downCount >= 2 && !interactive) {
+                    log("TV watch: $ip is back, waking the box")
+                    _mainHandler.post { _wakeForTv(app) }
+                }
+                downCount = if (up) 0 else downCount + 1
+            }
+        }, "tv-watch").apply { isDaemon = true; start() }
+    }
+
+    private fun _ping(ip: String): Boolean = try {
+        val p = ProcessBuilder("/system/bin/ping", "-c", "1", "-W", "1", ip).redirectErrorStream(true).start()
+        p.inputStream.readBytes()
+        p.waitFor() == 0
+    } catch (_: Exception) {
+        try { java.net.InetAddress.getByName(ip).isReachable(1_000) } catch (_: Exception) { false }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun _wakeForTv(app: String) {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        pm.newWakeLock(PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+            "airplay:tvwatch").acquire(3_000)
+        if (app.isEmpty()) return
+        // after the launcher's own wake handling: open the app as a fresh task
+        _mainHandler.postDelayed({
+            val i = packageManager.getLeanbackLaunchIntentForPackage(app) ?: packageManager.getLaunchIntentForPackage(app)
+            if (i == null) { log("TV watch: $app not installed"); return@postDelayed }
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            try { startActivity(i); log("TV watch: opened $app fresh") } catch (e: Exception) { log("TV watch: open $app failed: $e") }
+        }, 2_500)
+    }
 
     // AirPlay turned the TV on: turn it back off 30 s after the sender leaves (or never got in),
     // unless someone picked up the remote meanwhile
