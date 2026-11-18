@@ -1175,9 +1175,28 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             var downCount = 0
             var awakeMisses = 0
+            var musicLock: PowerManager.WakeLock? = null
+            var musicStoppedAt = 0L
             while (true) {
                 try { Thread.sleep(2_000) } catch (_: InterruptedException) { return@Thread }
                 try {
+                    // music playing (Spotify, AirPlay...): keep the screen on so the player's own now-playing
+                    // screen stays instead of the screensaver; no app can read another's track on these boxes
+                    val music = prefs[Prefs.MUSIC_KEEPS_SCREEN_ON] && pm.isInteractive && audioManager.isMusicActive
+                    if (music) {
+                        musicStoppedAt = 0L
+                        if (musicLock == null) {
+                            @Suppress("DEPRECATION")
+                            musicLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE, "airplay:music").apply { acquire() }
+                            log("Music playing: screen stays on")
+                        }
+                    } else if (musicLock != null) {
+                        if (musicStoppedAt == 0L) musicStoppedAt = SystemClock.elapsedRealtime()
+                        if (SystemClock.elapsedRealtime() - musicStoppedAt > 5_000 || !pm.isInteractive) {
+                            musicLock?.release(); musicLock = null; musicStoppedAt = 0L
+                            log("Music stopped: screensaver allowed again")
+                        }
+                    }
                     val ip = prefs[Prefs.TV_IP]
                     if (ip.isEmpty()) continue
                     val interactive = pm.isInteractive
